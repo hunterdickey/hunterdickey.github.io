@@ -1,0 +1,19 @@
+---
+title: "Assignment 1"
+author: "Hunter Dickey"
+date: "9/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## R Markdown
+```{r}
+pge_data <- read_csv("https://pge-energydatarequest.com/public_datasets")
+
+
+
+```
+

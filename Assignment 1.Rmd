@@ -1,0 +1,63 @@
+---
+title: "Assignment 1"
+author: "Hunter Dickey"
+date: "9/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## R Markdown
+```{r}
+rm(list=ls())
+pge_data <- read_csv("https://pge-energydatarequest.com/public_datasets")
+
+pge_20_q1_elec <- read_csv("PGE_2020_Q1_ElectricUsageByZip.csv")
+
+
+```
+
+```{r}
+library(tidyverse)
+
+years <- 2017:2020
+quarters <- 1:4
+type <- "Electric"
+
+pge_1720_elec <- NULL
+for(year in years) {
+  for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_1720_elec <- rbind(pge_1720_elec,temp)
+  # Note rbind requires field names to be consistent for every new thing that you add.
+
+  saveRDS(pge_1720_elec, "pge_1720_elec.rds")
+  }
+}
+# adding 2021 Q1 and Q2
+pge_21_Q1_elec <- read.csv("PGE_2021_Q1_ElectricUsageByZip.csv")
+
+pge_21_Q2_elec <- read.csv("PGE_2021_Q2_ElectricUsageByZip.csv")
+
+pge_21_elec <- rbind(pge_21_Q1_elec, pge_21_Q2_elec)
+
+pge_elec_total <- rbind(pge_1720_elec, pge_21_elec)
+
+```
+
