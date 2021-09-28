@@ -188,11 +188,29 @@ library(plotly)
 
 #Electric 
 unique(pge_elec_total$CUSTOMERCLASS)
+res_elec <- pge_elec_total[(pge_elec_total$CUSTOMERCLASS=="Elec- Residential"), na.rm = TRUE]
+
+com_elec <- pge_elec_total[which(pge_elec_total$CUSTOMERCLASS=="Elec- Commercial"), na.rm = TRUE]
+
+#Gas
+
+res_gas <- pge_gas_total[which(pge_elec_total$CUSTOMERCLASS=="Gas- Residential"), na.rm = TRUE]
+
+com_gas <- pge_gas_total[which(pge_elec_total$CUSTOMERCLASS=="Gas- Commercial"), na.rm = TRUE]
 
 
+#combine
 
+res_data <- rbind(res_elec, res_gas)
+  
+com_data <- rbind(com_elec, com_gas)
+```
+
+```{r}
+library(tidyverse)
+library(plotly)
 pge_chart_commercial <-
- pge_elec_total %>% 
+ com_data %>% 
   ggplot() +
   geom_bar(
     aes(
@@ -205,11 +223,11 @@ pge_chart_commercial <-
   ) +
   labs(
     x = "Month",
-    y = "kWh",
-    title = "PG&E Territory Monthly Electricity Usage, 2019",
+    y = "KBTU",
+    title = "PG&E Territory Monthly Commercial Usage",
     fill = "Electricity Type"
   )
-pge_chart %>% 
+pge_chart_commercial %>% 
   ggplotly() %>% 
   layout(
     xaxis = list(fixedrange = T),
@@ -218,13 +236,34 @@ pge_chart %>%
   config(displayModeBar = F)
 
 ```
+
 ```{r}
- #3.412 is the conversion kkw to kbtu 
 library(tidyverse)
-
-
-
-
-
+library(plotly)
+pge_chart_res <-
+ res_data %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = MONTH,
+      y = TOTALKBTU,
+      fill = CUSTOMERCLASS
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Month",
+    y = "KBTU",
+    title = "PG&E Territory Monthly Residential Usage",
+    fill = "Electricity Type"
+  )
+pge_chart_res %>% 
+  ggplotly() %>% 
+  layout(
+    xaxis = list(fixedrange = T),
+    yaxis = list(fixedrange = T)
+  ) %>% 
+  config(displayModeBar = F)
 ```
 
