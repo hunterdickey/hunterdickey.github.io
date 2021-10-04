@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 
 
 ```
@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = FALSE)
 rm(list=ls())
 library(tidyverse)
 setwd("~/Documents/GitHub/Assignment-1")
+
+
 pge_data <- read_csv("https://pge-energydatarequest.com/public_datasets")
 
 pge_20_q1_elec <- read_csv("PGE_2020_Q1_ElectricUsageByZip.csv")
@@ -103,7 +105,7 @@ class(pge_elec_total$TOTALKWH)
 ```{r}
 library(tidyverse)
 
-years <- 2017:2021
+years <- 2017:2020
 quarters <- 1:4
 type <- "Gas"
 
@@ -188,27 +190,47 @@ library(plotly)
 
 #Electric 
 unique(pge_elec_total$CUSTOMERCLASS)
+
 res_elec <- pge_elec_total[(pge_elec_total$CUSTOMERCLASS=="Elec- Residential"), na.rm = TRUE]
+
+res_elec$TOTALKWH <- NULL
+
+res_elec$AVERAGEKWH <- NULL
 
 com_elec <- pge_elec_total[which(pge_elec_total$CUSTOMERCLASS=="Elec- Commercial"), na.rm = TRUE]
 
+com_elec$TOTALKWH <- NULL
+
+com_elec$AVERAGEKWH <- NULL
+
 #Gas
 
-res_gas <- pge_gas_total[which(pge_elec_total$CUSTOMERCLASS=="Gas- Residential"), na.rm = TRUE]
+res_gas <- pge_gas_total[which(pge_gas_total$CUSTOMERCLASS=="Gas- Residential"), na.rm = TRUE]
 
-com_gas <- pge_gas_total[which(pge_elec_total$CUSTOMERCLASS=="Gas- Commercial"), na.rm = TRUE]
+res_gas$TOTALTHM <- NULL
 
+res_gas$AVERAGETHM <- NULL
+
+com_gas <- pge_gas_total[which(pge_gas_total$CUSTOMERCLASS=="Gas- Commercial"), na.rm = TRUE]
+
+com_gas$TOTALTHM <- NULL
+
+com_gas$AVERAGETHM <- NULL
 
 #combine
 
 res_data <- rbind(res_elec, res_gas)
   
 com_data <- rbind(com_elec, com_gas)
+
 ```
 
 ```{r}
 library(tidyverse)
 library(plotly)
+
+#Graph 
+
 pge_chart_commercial <-
  com_data %>% 
   ggplot() +
@@ -225,8 +247,9 @@ pge_chart_commercial <-
     x = "Month",
     y = "KBTU",
     title = "PG&E Territory Monthly Commercial Usage",
-    fill = "Electricity Type"
+    fill = "Power Type"
   )
+
 pge_chart_commercial %>% 
   ggplotly() %>% 
   layout(
@@ -235,35 +258,82 @@ pge_chart_commercial %>%
   ) %>% 
   config(displayModeBar = F)
 
+
 ```
 
 ```{r}
 library(tidyverse)
 library(plotly)
-pge_chart_res <-
- res_data %>% 
-  ggplot() +
-  geom_bar(
-    aes(
-      x = MONTH,
-      y = TOTALKBTU,
-      fill = CUSTOMERCLASS
-    ),
-    stat = "identity",
-    position = "stack"
-  ) +
-  labs(
-    x = "Month",
-    y = "KBTU",
-    title = "PG&E Territory Monthly Residential Usage",
-    fill = "Electricity Type"
-  )
-pge_chart_res %>% 
-  ggplotly() %>% 
+
+#Residential
+plot_ly() %>% 
+   add_trace(
+    data = res_data %>% filter(CUSTOMERCLASS == "Gas- Residential"),
+    x = ~MONTH,
+    y = ~TOTALKBTU,
+    type = "bar",
+    name = "Gas"
+  ) %>% 
+  add_trace(
+    data = res_data %>% filter(CUSTOMERCLASS == "Elec- Residential"),
+    x = ~MONTH,
+    y = ~TOTALKBTU,
+    type = "bar",
+    name = "Electric"
+  ) %>% 
   layout(
-    xaxis = list(fixedrange = T),
-    yaxis = list(fixedrange = T)
+    xaxis = list(
+      title = "Month",
+      fixedrange = T
+    ),
+    yaxis = list(
+      title = "BTU",
+      fixedrange = T
+    ),
+    barmode = "stack",
+    legend = list(title = list(text = "Power Type"))
   ) %>% 
   config(displayModeBar = F)
 ```
 
+```{r}
+# Commercial 
+library(tidyverse)
+library(plotly)
+
+
+plot_ly() %>% 
+   add_trace(
+    data = com_data %>% filter(CUSTOMERCLASS == "Gas- Commercial"),
+    x = ~MONTH %>% factor(),
+    y = ~TOTALKBTU,
+    type = "bar",
+    name = "Gas"
+  ) %>% 
+  add_trace(
+    data = com_data %>% filter(CUSTOMERCLASS == "Elec- Commercial"),
+    x = ~MONTH %>% factor(),
+    y = ~TOTALKBTU,
+    type = "bar",
+    name = "Electric"
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = "Month",
+      fixedrange = T
+    ),
+    yaxis = list(
+      title = "BTU",
+      fixedrange = T
+    ),
+    barmode = "stack",
+    legend = list(title = list(text = "Power Type"))
+  ) %>% 
+  config(displayModeBar = F)
+```
+
+On the aggregate, although I was not able to delineate year on year patterns visually on this attempt, the PGE electricity and gas usage across the commercial and residential sectors both follow a visible and consistent seasonal trend from 2017-2021, with increases in usage across colder months and seasons and a significant drop with the advent of warmer weather. 
+
+I assumed that this seasonality trend would be true across both the residential and commercial data sets. 
+
+There is a further assumptions regarding the pandemic that I am leaning on here. That is, Covid may have driven increases in residential electric and gas power usage, and driven decreases in the commercial sector with the mass shift to remote working and reliance on electricity for communication, work, and and increasingly localized home-based working society. 
