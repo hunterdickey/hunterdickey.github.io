@@ -27,7 +27,129 @@ library(mapview)
 # pipelines are %>% and they string things together.
 ```
 
+```{r}
+#isolate bay area counties with 'membership' vector
 
+bay_county_names <- 
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+#cb=T is rough outline 
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+```
+
+```{r}
+#basic bay plot
+ggplot(bay_counties) + geom_sf()
+```
+
+```{r}
+# tigris places, need for HW-- palo alto specific. 
+
+ca_cities <- places("CA", cb = T, progress_bar = FALSE)
+
+# now correspond the cities (above) with the counties from earlier, with brackets in sf function (specialized for this specific tool (sf), ususally only use brackets for rows and columns of data frams. ) 
+
+bay_cities <- ca_cities[bay_counties, ]
+
+```
+
+```{r}
+
+#then you map it
+
+mapview(bay_counties, alpha.regions = 0) + mapview(bay_cities)
+
+#caveate- adjacent/touching cities to the selected places are kept in this approach. but are NOT in these counties. 
+
+# this is a basic framework. 
+
+# to fix this touching thing,. use a pipe that overlaps/instesects based on the 'centroids' of the cities. 
+
+#this will now exclude the cities touching the counties while keeping these cities within and labeling the cities as well.  
+
+bay_cities_within <-
+  ca_cities %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_set_geometry(NULL) %>% 
+  left_join(ca_cities %>% select(GEOID)) %>% 
+  st_as_sf()
+
+#the "." before [bay_counties] tells the pipe where to put the object ca_cities/how you want it to be received. 
+```
+
+```{r}
+#graph this specified data graph with bay cities within now instead of bay cities. 
+
+mapview(bay_counties, alpha.regions = 0) + mapview(bay_cities_within, label = "NAME")
+```
+
+```{r}
+
+#Now onto census data- Census Block groups CBG's
+bay_cbgs <- block_groups("CA", bay_county_names[1:9], cb = T, progress_bar = F)
+```
+
+```{r}
+#make a data frame with new fast looper map_dfr
+
+#get census data blocks
+bay_cbgs <- 
+  bay_county_names %>% 
+  map_dfr(function(county) {
+    block_groups("CA", county, cb = T, progress_bar = F)
+  })
+```
+
+
+```{r}
+#extracting East Palo Alto 
+
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(
+    data = bay_cities_within[99,],
+    color = "green",
+    label = ~NAME
+  )
+
+# census size data 
+#https://api.census.gov/data.html
+```
+
+```{r}
+ggplot(ca_counties) + geom_sf()
+
+```
+
+```{r}
+mapview(ca_counties)
+```
+
+```{r}
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(
+    data = ca_counties
+  ) %>%
+  addMarkers(
+    data = ca_counties %>% 
+      st_centroid()
+  )
+```
 ```{r}
 pge_20_elec
 
@@ -88,4 +210,48 @@ mapview(ca_counties)
 #region in US 
 #and the group of variables in which table is on the census
 ```
+
+
+
+```{r}
+#bay zip code extraction from tigris and census
+usa_zips <- 
+  zctas(cb = T, progress_bar = F)
+
+bay_zips <-
+  usa_zips %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_set_geometry(NULL) %>% 
+  left_join(usa_zips %>% select(GEOID10)) %>% 
+  st_as_sf()
+```
+
+```{r}
+```{r}
+#leaflet is op 
+
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(
+    data = bay_counties,
+    fill = F,
+    weight = 2,
+    label = ~NAME
+  ) %>%
+  addPolygons(
+    data = bay_cities %>% 
+      filter(!GEOID %in% bay_cities_within$GEOID),
+    color = "red",
+    label = ~NAME
+  ) %>% 
+  addPolygons(
+    data = bay_cities_within,
+    color = "green",
+    label = ~NAME
+  )
+
+```
+```
+
 

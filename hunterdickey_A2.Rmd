@@ -13,10 +13,9 @@ knitr::opts_chunk$set(echo = F, warning = F, message = F)
 setwd("~/Documents/GitHub/hunterdickey.github.io")
 ```
 
-produce a map of changes in population between 2010 and 2020 for a specific place in the Bay Area (e.g., a city like East Palo Alto).
+Map of changes in population between 2010 and 2020 for a specific place in the Bay Area (e.g., a city like East Palo Alto).
 
-pick east palo alto 
-have that one space 
+I selected East Palo ALto.
 
 
 ```{r}
@@ -39,190 +38,6 @@ st_crs(ca_counties)
 #EPSG is imortant. sf recognizes these as imputs. TIGRIS is always in 4269
 #Google maps is in 4326 (effectivly the same)
 #use st_transform (in website)
-```
-
-
-```{r}
-ggplot(ca_counties) + geom_sf()
-
-```
-
-```{r}
-mapview(ca_counties)
-```
-
-```{r}
-leaflet() %>% 
-  addTiles() %>% 
-  addPolygons(
-    data = ca_counties
-  ) %>%
-  addMarkers(
-    data = ca_counties %>% 
-      st_centroid()
-  )
-```
-
-```{r}
-#isolate bay area counties with 'membership' vector
-
-bay_county_names <- 
-  c(
-    "Alameda",
-    "Contra Costa",
-    "Marin",
-    "Napa",
-    "San Francisco",
-    "San Mateo",
-    "Santa Clara",
-    "Solano",
-    "Sonoma"
-  )
-
-#cb=T is rough outline 
-bay_counties <-
-  counties("CA", cb = T, progress_bar = F) %>%
-  filter(NAME %in% bay_county_names)
-
-```
-
-```{r}
-#basic bay plot
-ggplot(bay_counties) + geom_sf()
-```
-
-```{r}
-# tigris places, need for HW-- palo alto specific. 
-
-ca_cities <- places("CA", cb = T, progress_bar = FALSE)
-
-# now correspond the cities (above) with the counties from earlier, with brackets in sf function (specialized for this specific tool (sf), ususally only use brackets for rows and columns of data frams. ) 
-
-bay_cities <- ca_cities[bay_counties, ]
-
-```
-
-```{r}
-
-#then you map it
-
-mapview(bay_counties, alpha.regions = 0) + mapview(bay_cities)
-
-#caveate- adjacent/touching cities to the selected places are kept in this approach. but are NOT in these counties. 
-
-# this is a basic framework. 
-
-# to fix this touching thing,. use a pipe that overlaps/instesects based on the 'centroids' of the cities. 
-
-#this will now exclude the cities touching the counties while keeping these cities within and labeling the cities as well.  
-
-bay_cities_within <-
-  ca_cities %>% 
-  st_centroid() %>% 
-  .[bay_counties, ] %>% 
-  st_set_geometry(NULL) %>% 
-  left_join(ca_cities %>% select(GEOID)) %>% 
-  st_as_sf()
-
-#the "." before [bay_counties] tells the pipe where to put the object ca_cities/how you want it to be received. 
-```
-
-```{r}
-#graph this specified data graph with bay cities within now instead of bay cities. 
-
-mapview(bay_counties, alpha.regions = 0) + mapview(bay_cities_within, label = "NAME")
-```
-
-```{r}
-#leaflet is op 
-
-leaflet() %>% 
-  addTiles() %>% 
-  addPolygons(
-    data = bay_counties,
-    fill = F,
-    weight = 2,
-    label = ~NAME
-  ) %>%
-  addPolygons(
-    data = bay_cities %>% 
-      filter(!GEOID %in% bay_cities_within$GEOID),
-    color = "red",
-    label = ~NAME
-  ) %>% 
-  addPolygons(
-    data = bay_cities_within,
-    color = "green",
-    label = ~NAME
-  )
-
-```
-
-```{r}
-
-#Now onto census data- Census Block groups CBG's
-bay_cbgs <- block_groups("CA", bay_county_names[1:9], cb = T, progress_bar = F)
-```
-
-```{r}
-#make a data frame with new fast looper map_dfr
-
-#get census data blocks
-bay_cbgs <- 
-  bay_county_names %>% 
-  map_dfr(function(county) {
-    block_groups("CA", county, cb = T, progress_bar = F)
-  })
-
-```
-
-```{r}
-#bay zip code extraction from tigris and census
-usa_zips <- 
-  zctas(cb = T, progress_bar = F)
-
-bay_zips <-
-  usa_zips %>% 
-  st_centroid() %>% 
-  .[bay_counties, ] %>% 
-  st_set_geometry(NULL) %>% 
-  left_join(usa_zips %>% select(GEOID10)) %>% 
-  st_as_sf()
-```
-
-```{r}
-pge_20_res_elec <-
-  pge_20_elec %>% 
-  filter(CUSTOMERCLASS == "Elec- Residential") %>% 
-  mutate(
-    ZIPCODE = ZIPCODE %>% as.character()
-  ) %>% 
-  group_by(ZIPCODE) %>% 
-  summarize(
-    TOTALKWH = sum(TOTALKWH, na.rm = T)
-  ) %>% 
-  right_join(
-    bay_zips %>% select(GEOID10),
-    by = c("ZIPCODE" = "GEOID10")
-  ) %>% 
-  st_as_sf() %>% 
-  st_transform(4326)
-```
-
-
-```{r}
-#extracting East Palo Alto 
-
-leaflet() %>% 
-  addTiles() %>% 
-  addPolygons(
-    data = bay_cities_within[99,],
-    color = "green",
-    label = ~NAME
-  )
-
-# census size data 
-#https://api.census.gov/data.html
 ```
 
 ```{r}
@@ -284,14 +99,6 @@ smc_pop_2010 <-
 
 ```
 
-```{r}
-install.packages("devtools")
-
-
-library(devtools)
-install_github('walkerke/tigris')
-library(tigris)
-```
 
 ```{r}
 
@@ -303,16 +110,12 @@ epa_pop_2020 <- smc_pop_2020 %>%
   left_join(smc_blocks_2020 %>% select(block = GEOID20)) %>% 
   st_as_sf() %>% 
   st_centroid() %>% 
-  .[epa_boundary, ] %>% 
+  .[epa_boundary_2020, ] %>% 
   st_set_geometry(NULL) %>% 
   left_join(smc_blocks_2020 %>% select(block = GEOID20)) %>% 
   st_as_sf()
 
 
-```
-
-```{r}
-epa_tot_pop_2020 <- mapview(epa_boundary, color = "red") + mapview(epa_pop_2020, zcol = "pop")
 ```
 
 ```{r}
@@ -325,14 +128,10 @@ epa_pop_2010 <- smc_pop_2010 %>%
   left_join(smc_blocks_2010 %>% select(block = GEOID10)) %>% 
   st_as_sf() %>% 
   st_centroid() %>% 
-  .[epa_boundary, ] %>% 
+  .[epa_boundary_2010, ] %>% 
   st_set_geometry(NULL) %>% 
   left_join(smc_blocks_2010 %>% select(block = GEOID10)) %>% 
   st_as_sf()
-```
-
-```{r}
-epa_tot_pop_2010 <- mapview(epa_boundary, color = "red") + mapview(epa_pop_2010, zcol = "pop")
 ```
 
 ```{r}
@@ -369,10 +168,6 @@ leaflet() %>%
 ```
 
 ```{r}
-
-epa_pop_2010$pop_difference_1020 <- epa_pop_2020$pop - epa_pop_2010$pop
-
-
 smc_blocks_2010 <- blocks("CA", "San Mateo", year = 2010, progress_bar = F)
 
 epa_boundary_2010 <- places("CA", progress_bar = F) %>% 
@@ -381,7 +176,7 @@ epa_pop_difference <- smc_pop_2010 %>%
   left_join(smc_blocks_2010 %>% select(block = GEOID10)) %>% 
   st_as_sf() %>% 
   st_centroid() %>% 
-  .[epa_boundary, ] %>% 
+  .[epa_boundary_2010, ] %>% 
   st_set_geometry(NULL) %>% 
   left_join(smc_blocks_2010 %>% select(block = GEOID10)) %>% 
   st_as_sf()
@@ -394,45 +189,57 @@ epa_pop_difference$pop = epa_pop_2010$pop_difference_1020
 ```
 
 ```{r}
-mapview(epa_boundary_2020, color = "red") + mapview(epa_pop_2010, zcol = "pop", color = "blue") + mapview(epa_pop_2020, zcol = "pop", color = "red") + mapview(epa_pop_difference, zcol = "pop") + mapview(epa_pop_dif_per_acre, zcol = "pop")
-
-```
-
-```{r}
-mapview(epa_pop_difference, zcol = "pop")
-```
-
-```{r}
 # population change in people per acre from 2010-2020
 
-epa_pop_dif_per_acre <- smc_pop_2010 %>% 
+epa_abs_dif_people_per_acre <- smc_pop_2010 %>% 
   left_join(smc_blocks_2010 %>% select(block = GEOID10)) %>% 
   st_as_sf() %>% 
   st_centroid() %>% 
-  .[epa_boundary, ] %>% 
+  .[epa_boundary_2010, ] %>% 
   st_set_geometry(NULL) %>% 
   left_join(smc_blocks_2010 %>% select(block = GEOID10)) %>% 
   st_as_sf()
 
-epa_pop_dif_per_acre 
+epa_abs_dif_people_per_acre
 # 1689.6 acres in East Palo alto 
 
 sum(epa_pop_difference$pop)
 
 # 5078/1689.6
 
-epa_pop_dif_per_acre$pop <- epa_pop_difference$pop
+epa_abs_dif_people_per_acre$pop <- epa_pop_difference$pop
 
-epa_pop_dif_per_acre$pop <- epa_pop_dif_per_acre$pop/1689.6
+epa_abs_dif_people_per_acre$pop <- epa_abs_dif_people_per_acre$pop/1689.6
 
 
-epa_pop_dif_per_acre
+epa_abs_dif_people_per_acre
 
 #increased roughly 3 people per acre on average across the block from the beginning to the end of the 2010-2020 period. 
 ```
+For the followung 
+The first interactive map below outlines the East Palo ALto 'place' boundaries and the East Palo Alto Blocks from 2010 and 2020.
 
 ```{r}
-
-mapview(epa_pop_dif_per_acre, zcol = "pop")
+mapview(epa_boundary_2020, color = "red") + mapview(epa_pop_2020, zcol = "pop", fill = F) + mapview(epa_pop_2010, zcol = "pop", fill = F) 
 ```
 
+This interactive map outlines the actual total population of East Palo Alto (in people) in 2010, 2020, and the change in population per place block in East Palo Alto from 2010-2020. These layers can be selected/applied/removed using the layer toggle on the left side of the map display. 
+
+```{r}
+mapview(epa_pop_difference, zcol = "pop") + mapview(epa_pop_2020, zcol = "pop") + mapview(epa_pop_2010, zcol = "pop", color = "blue")
+```
+
+This interactive map outlines the change in population (in people per acre) within East Palo ALto from 2010-2020. 
+
+```{r}
+mapview(epa_abs_dif_people_per_acre, zcol = "pop")
+```
+
+This final map overlays the 2010-2020 East Palo Alto total population difference, and the absolute population difference in people per acre from 2010-2020. 
+```{r}
+mapview(epa_pop_difference, zcol = "pop") + mapview(epa_abs_dif_people_per_acre, zcol = "pop")
+
+```
+
+
+Reflection on Assignment 2. 
