@@ -181,7 +181,7 @@ epa_pop_difference <- smc_pop_2010 %>%
   left_join(smc_blocks_2010 %>% select(block = GEOID10)) %>% 
   st_as_sf()
 
-epa_pop_2010$pop_difference_1020 <- epa_pop_2020$pop - epa_pop_2010$pop
+epa_pop_2010$pop_difference_1020 <- epa_pop_2010$pop - epa_pop_2020$pop
 
 
 epa_pop_difference$pop = epa_pop_2010$pop_difference_1020 
@@ -223,7 +223,7 @@ The first interactive map below outlines the East Palo ALto 'place' boundaries a
 mapview(epa_boundary_2020, color = "red") + mapview(epa_pop_2020, zcol = "pop", fill = F) + mapview(epa_pop_2010, zcol = "pop", fill = F) 
 ```
 
-This interactive map outlines the actual total population of East Palo Alto (in people) in 2010, 2020, and the change in population per place block in East Palo Alto from 2010-2020. These layers can be selected/applied/removed using the layer toggle on the left side of the map display. 
+This interactive map outlines the actual total population of East Palo Alto (in people) in 2010, 2020, and the change in population per place block in East Palo Alto from 2010-2020. These layers can be selected/applied/removed using the layer toggle on the left side of the map display. The values indicate the +/- or gains/losses in population from 2010-2020. 
 
 ```{r}
 mapview(epa_pop_difference, zcol = "pop") + mapview(epa_pop_2020, zcol = "pop") + mapview(epa_pop_2010, zcol = "pop", color = "blue")
@@ -235,7 +235,7 @@ This interactive map outlines the change in population (in people per acre) with
 mapview(epa_abs_dif_people_per_acre, zcol = "pop")
 ```
 
-This final map overlays the 2010-2020 East Palo Alto total population difference, and the absolute population difference in people per acre from 2010-2020. 
+This final map overlays the 2010-2020 East Palo Alto total population difference, and the absolute population difference in people per acre from 2010-2020. The per acre measurement can be read in each block (i.e. an absolute increase of .74 people per acre in 10 years). 
 ```{r}
 mapview(epa_pop_difference, zcol = "pop") + mapview(epa_abs_dif_people_per_acre, zcol = "pop")
 
@@ -243,3 +243,7 @@ mapview(epa_pop_difference, zcol = "pop") + mapview(epa_abs_dif_people_per_acre,
 
 
 Reflection on Assignment 2. 
+
+I note a population increase in the city of East Palo Alto from 2010-2020. The trends may indicate or follow a potential economic increases in the area, given the bay area's typically high baseline cost of living. Another primary assumption that I made here was that the 2010 data had more census blocks (193) than the 2020 data (177) which means that some of the population changes in the city may not be accurately noted or as precisely noted as I would have liked. This assumption was made to ease the joining of data blocks to ensure that the 2020 (177) observations would fit and plot into the 2010 (193) observations when merging. In terms of the per-acre change, I assumed that by dividing the 2010-2020 population difference of each sector block in the city by the total acreage of East Palo Alto, I would create an output of each block's absolute change in person per acre across the city within the 2010-2020 time frame, seeing as the blocks themselves geographically cover the total acreage figure. 
+
+A quick caveat regarding my data is that it does not measure demographic shifts in population and therefore may be less useful for more specific data measures and analysis than simple looking at general population shifts in the city. 
