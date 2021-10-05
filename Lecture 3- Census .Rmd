@@ -1,0 +1,91 @@
+---
+title: "Lecture Week 3"
+author: "Hunter Dickey"
+date: "9/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+install.packages(c("sf", "tigris", "censusapi", "mapview"))
+install.packages("tigris")
+
+library(tidyverse)
+library(sf)
+library(tigris)
+library(censusapi)
+library(mapview)
+
+
+```
+
+
+```{r}
+# pipelines are %>% and they string things together.
+```
+
+
+```{r}
+pge_20_elec
+
+  pge_final <-
+  pge_20_elec %>% 
+  filter(
+    CUSTOMERCLASS %in% 
+      c(
+        "Elec- Residential",
+        "Elec- Commercial"
+      )
+  ) %>% 
+  select(
+    -c(YEAR, COMBINED, AVERAGEKWH)
+  ) %>% 
+  group_by(MONTH, CUSTOMERCLASS) %>% 
+  summarize(
+    TOTALKWH = 
+      sum(
+        TOTALKWH, 
+        na.rm = T
+      ),
+    TOTALCUSTOMERS =
+      sum(
+        TOTALCUSTOMERS,
+        na.rm = T
+      )
+  ) %>% 
+  mutate(
+    AVERAGEKWH =
+      TOTALKWH/TOTALCUSTOMERS
+  )
+
+pge_final
+```
+
+```{r}
+ca_counties <-  counties("CA")
+  #like reading something online 
+#need sf to produce Sf data 
+  
+```
+
+```{r}
+#use mapview
+#can use ggplot way or just use the package mapview 
+
+mapview(ca_counties)
+```
+
+```{r}
+#ch 2.2 censusapi package 
+#sys.setenv (census key) get the key for the back door 
+# find  the next function 
+#acs_var
+# downloads the entire dataset 
+# get census gets you daya, year, type (5 or one year) the unit you want (block) 
+#region in US 
+#and the group of variables in which table is on the census
+```
+
