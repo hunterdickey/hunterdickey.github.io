@@ -1,0 +1,310 @@
+---
+title: "hunterdickey_A4"
+author: "Hunter Dickey"
+date: "10/16/2021"
+output: html_document
+---
+
+---
+title: "hunterdickey_A4"
+author: "Hunter Dickey"
+date: "10/14/2021"
+output: html_document
+---
+
+Minimum Result Analysis:
+“Is there disproportionate education attainment by race in San Mateo County?”
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+setwd("~/Documents/GitHub/hunterdickey.github.io")
+```
+
+```{r}
+library(tidyverse)
+library(censusapi)
+Sys.setenv(CENSUS_KEY="d606b444d6d806f3ba91342926b0e6e9356b2501")
+
+acs_vars_2019_5yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs5",
+    type = "variables"
+  )
+```
+
+```{r}
+race_categories <- c(
+  "White alone",
+  "Black or African American alone",
+  "American Indian and Alaska Native alone",
+  "Asian alone",
+  "Native Hawaiian and Other Pacific Islander alone",
+  "Some Other Race alone",
+  "Two or more Races"
+)
+
+
+bay_edu_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:081",
+ regionin = "state:06",
+ vars = paste0("group(C15002",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, NA, "education"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(education)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+```
+
+```{r}
+
+bay_race_total <-
+  bay_edu_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(education = "Total")
+
+bay_edu_race_2019 %>% 
+  group_by(education, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = education %>% factor(levels = rev(c("Total",unique(bay_edu_race_2019$education)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_edu_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Educational Attainment",
+    y = "Proportion of households",
+    title = "Bay Area household Educational Attainment by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+
+```
+
+```{r}
+analysis
+
+((sum(bay_race_total$estimate[1:6])/sum(bay_race_total$estimate))*100) %>% round()
+
+((bay_income_race %>% 
+  filter(income %in% bay_income_race$income[1:5]) %>% 
+  filter(race != "White Alone") %>% 
+  pull(estimate) %>% 
+  sum()) /
+  (bay_income_race %>% 
+    filter(income %in% bay_income_race$income[1:5]) %>% 
+    pull(estimate) %>% 
+    sum()) * 100) %>% 
+  round()
+
+```
+
+
+```{r}
+ethn_categories <- c(
+  "White alone, not hispanic or latino",
+  "Hispanic or Latino",
+  "Other, not White or latino"
+)
+
+
+bay_edu_ethn_white <- 
+  8 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:081",
+ regionin = "state:06",
+ vars = paste0("group(C15002",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, NA, "education"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(education)) %>%
+  mutate(
+    race = ethn_categories[1]
+  )
+  })
+
+#2
+bay_edu_ethn_hisp <- 
+  9 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:081",
+ regionin = "state:06",
+ vars = paste0("group(C15002",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, NA, "education"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(education)) %>%
+  mutate(
+    race = ethn_categories[2]
+  )
+  })
+
+#3 
+bay_edu_other_ethn_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:081",
+ regionin = "state:06",
+ vars = paste0("group(C15002",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, NA, "education"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(education)) %>%
+  mutate(
+    race = ethn_categories[3]
+  )
+  })
+
+
+bay_edu_ethn_2019 <- rbind(bay_edu_ethn_white, bay_edu_ethn_hisp, bay_edu_other_ethn_2019)
+
+```
+
+```{r}
+bay_ethn_total <-
+  bay_edu_ethn_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(education = "Total")
+
+bay_edu_ethn_2019 %>% 
+  group_by(education, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_ethn_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = education %>% factor(levels = rev(c("Total",unique(bay_edu_ethn_2019$education)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_edu_ethn_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Educational Attainment",
+    y = "Proportion of households",
+    title = "Bay Area household Educational Attainment by Ethnicity",
+    fill = "Ethnicity of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+
+```
+

@@ -86,7 +86,7 @@ pge_21_electric <- NULL
   temp <- read_csv(filename)
   
   pge_21_electric <- rbind(pge_21_electric,temp)
-  # 
+
 
   saveRDS(pge_21_electric, "pge_21_electric.rds")
 }

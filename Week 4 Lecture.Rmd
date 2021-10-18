@@ -1,0 +1,371 @@
+---
+title: "Week 4 Lecture Tuesday"
+author: "Hunter Dickey"
+date: "10/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("~/Documents/GitHub/hunterdickey.github.io")
+```
+
+Bay income, 100% spread, see tier differences in household income by race. 
+
+Using equality or equity in words
+
+default to ACS data 
+look up income and race on census.gov
+find ACS table B19001
+and it has "B19001A, B19001B, etc"
+which are the racial breakdowns 
+forloop through all the difference races
+
+step 1
+```{r}
+library(tidyverse)
+library(censusapi)
+Sys.setenv(CENSUS_KEY="d606b444d6d806f3ba91342926b0e6e9356b2501")
+
+acs_vars_2019_5yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs5",
+    type = "variables"
+  )
+```
+
+there are columns we don't need, select (ends with "e")
+```{r}
+bay_income_white_2019 <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = "group(B19001A)"
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "income"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(income)) %>%
+  mutate(
+    race = "white alone"
+  )
+#we only need total household counts
+#don't need to care about county delineations
+#group by and summarize concepts, tidyverse
+#summerize_all keeps every column and shows how you want to collapse and stack
+#remove all letter columns
+#pivot longer changes the structure of data from rows into columns, it pivots
+
+#mutate is a way to add back info and data 
+```
+
+```{r}
+for(x in 1:7){
+  
+  #temp <- your code
+  
+  full_dataset <- 
+    rbind(full_dataset, temp)
+  
+}
+c("A","B","C","D","E","F","G")
+```
+or tidyverse 4 loop 
+
+map_dfr will rbind for you mapping x for 1 , for 2, for 3, etc 
+
+letters x
+paste0 measn paste with no space
+
+#look in class chat 
+```{r}
+race_categories <- c(
+  "White alone",
+  "Black or African American alone",
+  "American Indian and Alaska Native alone",
+  "Asian alone",
+  "Native Hawaiian and Other Pacific Islander alone",
+  "Some Other Race alone",
+  "Two or more Races"
+)
+
+
+bay_income_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(B19001",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "income"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(income)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+```
+
+```{r}
+bay_income_race_2019 %>% 
+  group_by(income, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = income,
+      y = estimate,
+      fill = race
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Number of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  )
+```
+
+rotate the above graph with + coord_flip()
+```{r}
+bay_income_race_2019 %>% 
+  group_by(income, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = income,
+      y = estimate,
+      fill = race
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Number of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip()
+```
+
+Better, now the issue is the order of income tiers, it alphabetized, but we want the orgininal, provided ACS order.Use factor() which memorizes the order, and levels to dictate the level or order. 
+
+```{r}
+bay_income_race_2019 %>% 
+  group_by(income, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = income %>% factor(levels = unique(bay_income_race_2019$income)),
+      y = estimate,
+      fill = race %>% factor(levels = unique(bay_income_race_2019$race))
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Number of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip()
+```
+
+additional asthetics
+want to better see the smaller bars, position fill with do the trick, because the stack argument doesn't fill the space. 
+
+Also reverse the income order tiers, putting less than 10,000 at the top with rev(). Lastly, move legend to the bottom to create more space, usinf arguments (theme() and guides()
+
+```{r}
+
+bay_income_race_2019 %>% 
+  group_by(income, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = income %>% factor(levels = rev(unique(bay_income_race_2019$income))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_income_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Proportion of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+
+```
+
+Final step is add a 'total proportion catagory'
+
+```{r}
+bay_race_total <-
+  bay_income_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(income = "Total")
+
+bay_income_race_2019 %>% 
+  group_by(income, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = income %>% factor(levels = rev(c("Total",unique(bay_income_race_2019$income)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_income_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Proportion of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+
+
+
+
+
+
+```{r}
+census_race_categories <- data.frame(
+  code = c("A","B","C","D","E","F","G"),
+  category =
+    c(
+      "White Alone",
+      "Black or African American",
+      "American Indian and Alaska Native Alone",
+      "Asian Alone",
+      "Native Hawaiian and Other Pacific Islander Alone",
+      "Some Other Race Alone",
+      "Two or More Races"
+    )
+)
+```
+
+
+figure out specific figures and numbers from the data
+
+```{r}
+((sum(bay_race_total$estimate[1:6])/sum(bay_race_total$estimate))*100) %>% round()
+
+((bay_income_race %>% 
+  filter(income %in% bay_income_race$income[1:5]) %>% 
+  filter(race != "White Alone") %>% 
+  pull(estimate) %>% 
+  sum()) /
+  (bay_income_race %>% 
+    filter(income %in% bay_income_race$income[1:5]) %>% 
+    pull(estimate) %>% 
+    sum()) * 100) %>% 
+  round()
+
+((((bay_income_race %>% 
+  filter(income %in% bay_income_race$income[1:5]) %>% 
+  filter(race != "White Alone") %>% 
+  pull(estimate) %>% 
+  sum()) /
+  (bay_income_race %>% 
+    filter(income %in% bay_income_race$income[1:5]) %>% 
+    pull(estimate) %>% 
+    sum())) / (sum(bay_race_total$estimate[1:6])/sum(bay_race_total$estimate)) - 1) * 100) %>% 
+  round()
+```
+
+
+
+
+```{r}
+library(readxl)
+
+temp <- tempfile()
+download.file("https://oehha.ca.gov/media/downloads/calenviroscreen/document/calenviroscreen40resultsdatadictionaryd12021.zip",
+              destfile = temp)
+
+ces4 <- read_excel(
+  unzip(
+    temp, 
+    "CalEnviroScreen_4.0Excel_ADA_D1_2021.xlsx"
+  ), 
+  sheet = "DRAFTCES4.0_results"
+)
+
+unlink(temp)
+```
+
