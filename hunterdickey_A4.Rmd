@@ -12,9 +12,19 @@ date: "10/14/2021"
 output: html_document
 ---
 
-Minimum Result Analysis:
+Minimum Result Analysis: Race
 “Is there disproportionate education attainment by race in San Mateo County?”
 
+For the population 25 years and older in San Mateo county, there is a noticeable disproportionality to educational attainment. When compared to the share of total race groups by populations, the white racial group is underrepresented (at 38%) by 14% at the "less-than diploma level" when compared to their 52% share of the population. Across the other education levels of 'high school graduate', 'some college', and 'bachelor's degree or higher' the white proportions are 50%, 54%, and 55% respectively, which is far closer to the 52% of total population proportion. 
+
+Similarly to the white population, Asian Americans are underrepresented in the no diploma, and diploma only categories, while being much closer to their true population proportion, and slightly over represented in some college and completing higher education respectively. 
+
+On the flip side of this, American Indian and Alaska Native populations are noticeably over represented in the less than high school education level at 1.03%, when their true population percentage is .39% of the population at large. 
+
+Interestingly, the Black population proportion in San Mateo is underrepresented in the 'less than high school' category and  over represented in the high school graduate and some college or associate's degree levels. This is a positive trend I would infer, given America's history with African Americans; however, Alaska Natives/American Indians, the 'other' race category are still underrepresented at large in the higher education levels and Black Americans are still underrepresented at the bachelor's degree and beyond categories. 
+
+Secondary Result Analysis: Ethnicity 
+The total San Mateo population proportion estimates are 61% other ethnicities, 13% Hispanic, and 26% White. At the no diploma level, I found that the Hispanic population was severely over represented at 35%, the other ethnicities category was underrepresented by 4% and that the white population was severely underrepresented at 7%. At the diploma level, the Hispanic population was over represented by 7%, the white population was underrepresented by 5% and the other ethnicities category was underrepresented by 3%. Like in the race analysis the college/associates levels paralleled the general population smoothly and the bachelor level severely underrepresented the Hispanic community by 7%, while over representing the white and other ethnicities populations by 6% and 2% respectively. 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = F, warning = F, message = F)
@@ -127,20 +137,48 @@ bay_edu_race_2019 %>%
 ```
 
 ```{r}
-analysis
+#analysis
+no_dip <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$education == "Less than high school diploma"])
 
+#Total non-white
 ((sum(bay_race_total$estimate[1:6])/sum(bay_race_total$estimate))*100) %>% round()
 
-((bay_income_race %>% 
-  filter(income %in% bay_income_race$income[1:5]) %>% 
-  filter(race != "White Alone") %>% 
-  pull(estimate) %>% 
-  sum()) /
-  (bay_income_race %>% 
-    filter(income %in% bay_income_race$income[1:5]) %>% 
-    pull(estimate) %>% 
-    sum()) * 100) %>% 
-  round()
+#Total white
+(sum(bay_edu_race_2019$estimate[bay_edu_race_2019$race== "White alone"])/sum(bay_edu_race_2019$estimate)*100) %>% round()
+
+#Total alaska
+(sum(bay_edu_race_2019$estimate[bay_edu_race_2019$race== "American Indian and Alaska Native alone"])/sum(bay_edu_race_2019$estimate)*100)
+
+alas_no_dip <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$race== "American Indian and Alaska Native alone" & bay_edu_race_2019$education == "Less than high school diploma"])
+
+uneducated_alas <- ((alas_no_dip/no_dip)*100)
+
+# White categories
+
+white_no_dip <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$race== "White alone" & bay_edu_race_2019$education == "Less than high school diploma"])
+
+no_dip <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$education == "Less than high school diploma"])
+
+uneducated_white <- ((white_no_dip/no_dip)*100) %>% round()
+
+white_dip <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$race== "White alone" & bay_edu_race_2019$education == "High school graduate (includes equivalency)"])
+
+dip <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$education == "High school graduate (includes equivalency)"])
+
+hs_white <- ((white_dip/dip)*100) %>% round()
+
+white_some_college <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$race== "White alone" & bay_edu_race_2019$education == "Some college or associate's degree"])
+
+college<- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$education == "Some college or associate's degree"])
+
+some_college_white <- ((white_some_college/college)*100) %>% round()
+
+white_bach_plus <- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$race== "White alone" & bay_edu_race_2019$education == "Bachelor's degree or higher"])
+
+bachelor<- sum(bay_edu_race_2019$estimate[bay_edu_race_2019$education == "Bachelor's degree or higher"])
+
+higher_edu_white <- ((white_bach_plus/bachelor)*100) %>% round()
+
 
 ```
 
@@ -305,6 +343,101 @@ bay_edu_ethn_2019 %>%
       reverse = T
     )
   )
+
+```
+
+```{r}
+bay_edu_ethn_2019
+
+
+#Total white
+total_white_e <- (sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "White alone, not hispanic or latino"])/sum(bay_edu_ethn_2019$estimate)*100) %>% round()
+
+# Total Hispanic
+total_hisp_e <-(sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Hispanic or Latino"])/sum(bay_edu_ethn_2019$estimate)*100) %>% round()
+
+#Neither
+total_other_e <- (sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Other, not White or latino"])/sum(bay_edu_ethn_2019$estimate)*100) %>% round()
+
+
+#No diploma 
+
+no_dip_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$education == "Less than high school diploma"])
+
+#diploma
+dip_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$education == "High school graduate (includes equivalency)"])
+
+#college
+college_e<- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$education == "Some college or associate's degree"])
+
+#bachelor 
+bachelor_e<- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$education == "Bachelor's degree or higher"])
+
+
+
+#uneducated white 
+white_no_dip_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "White alone, not hispanic or latino" & bay_edu_ethn_2019$education == "Less than high school diploma"])
+
+#hs white
+white_dip_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "White alone, not hispanic or latino" & bay_edu_ethn_2019$education == "High school graduate (includes equivalency)"])
+#college white
+white_college_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "White alone, not hispanic or latino" & bay_edu_ethn_2019$education == "Some college or associate's degree"])
+
+#bachelor white
+white_bachelor_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "White alone, not hispanic or latino" & bay_edu_ethn_2019$education =="Bachelor's degree or higher"])
+
+uneducated_white <- ((white_no_dip_e/no_dip_e)*100) %>% round()
+
+hs_white <- ((white_dip_e/dip_e)*100) %>% round()
+
+college_white <- ((white_college_e/college_e)*100) %>% round()
+
+bachelor_white <- ((white_bachelor_e/bachelor_e)*100) %>% round()
+
+
+#uneducated Hispanic
+hisp_no_dip_e<- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Hispanic or Latino" & bay_edu_ethn_2019$education == "Less than high school diploma"])
+
+#hs hispanic 
+hisp_dip_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Hispanic or Latino" & bay_edu_ethn_2019$education == "High school graduate (includes equivalency)"])
+
+#college hispanic
+hisp_college_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Hispanic or Latino" & bay_edu_ethn_2019$education == "Some college or associate's degree"])
+
+#bachelor hispanic
+hisp_bachelor_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Hispanic or Latino" & bay_edu_ethn_2019$education =="Bachelor's degree or higher"])
+
+uneducated_hisp <- ((hisp_no_dip_e/no_dip_e)*100) %>% round()
+
+hs_hisp <- ((hisp_dip_e/dip_e)*100) %>% round()
+
+college_hisp <- ((hisp_college_e/college_e)*100) %>% round()
+
+bachelor_hisp <- ((hisp_bachelor_e/bachelor_e)*100) %>% round()
+
+
+#uneducated Other
+other_no_dip_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Other, not White or latino" & bay_edu_ethn_2019$education == "Less than high school diploma"])
+
+#hs Other
+other_dip_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Other, not White or latino" & bay_edu_ethn_2019$education == "High school graduate (includes equivalency)"])
+
+#college Other
+other_college_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Other, not White or latino" & bay_edu_ethn_2019$education == "Some college or associate's degree"])
+
+#bachelor Other
+other_bachelor_e <- sum(bay_edu_ethn_2019$estimate[bay_edu_ethn_2019$race== "Other, not White or latino" & bay_edu_ethn_2019$education =="Bachelor's degree or higher"])
+
+
+uneducated_other <- ((other_no_dip_e/no_dip_e)*100) %>% round()
+
+hs_other <- ((other_dip_e/dip_e)*100) %>% round()
+
+college_other <- ((other_college_e/college_e)*100) %>% round()
+
+bachelor_other <- ((other_bachelor_e/bachelor_e)*100) %>% round()
+
+
 
 ```
 
