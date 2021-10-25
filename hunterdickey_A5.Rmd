@@ -119,22 +119,13 @@ bay_ces4_map_s <- ces4_map[ces4_map$`California County`== "Sonoma",]
 
 fin_bay_ces4_map <- rbind(bay_ces4_map_a,bay_ces4_map_n,bay_ces4_map_sc,bay_ces4_map_cc,bay_ces4_map_sf,bay_ces4_map_s,bay_ces4_map_m,bay_ces4_map_sm,bay_ces4_map_s)
 
-
+fin_bay_ces4_map <- fin_bay_ces4_map %>%
+  select(!ends_with(c("Ozone","Diesel PM", "Drinking Water","CES 4.0 Score", "CES 4.0 Percentile", "CES 4.0 Percentile Range", "Lead", "Pesticides", "Tox. Release", "Traffic", "Cleanup Sites", "Groundwater Threats", "Haz. Waste", "IMP, Water Bodies", "Solid Waste", "Pollution Burden", "Low Birth Weight", "Cardiovascular Disease", "Education", "Linguistic Isolation", "Poverty", "Unemployment", "Housing Burden")))
 # Question 1
 
 mapview(fin_bay_ces4_map, zcol= "Asthma")
 
 mapview(fin_bay_ces4_map, zcol= "PM2.5")
-
-#do the bay area , find the 26th percentile. 
-
-class(ces4_clean$'Census Tract')
-class(ca_tracts$GEOID)
-
-# "01" %>% as numeric will only keep the 1
-
-# 1 %>% str_pad(2, "left", 0) will keep the zero by padding it. 
-# the ces4_map data now has geo cords. 
 ```
 
 
@@ -198,8 +189,6 @@ ggplot(
 # Rep Q3
 
 model_log <- lm(log(Asthma) ~ PM2.5, fin_bay_ces4_map)
-summary(model_log)
-
 ```
 
 
