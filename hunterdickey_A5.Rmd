@@ -22,12 +22,6 @@ library(leaflet)
 
 Sys.setenv(CENSUS_KEY="c8aa67e4086b4b5ce3a8717f59faa9a28f611dab")
 
-acs_vars_2019_5yr <-
-  listCensusMetadata(
-    name = "2019/acs/acs5",
-    type = "variables"
-  )
-
 ces_data_4 <- read_excel("calenviroscreen40resultsdatadictionary_F_2021.xlsx")
 
 ```
@@ -75,14 +69,6 @@ ces4_clean <- ces_data_4 %>%
 
 ca_tracts <- tracts("CA")
 
-
-ces4_map <- ces4_clean %>%
-  left_join(
-    ca_tracts %>%
-      select(GEOID) %>%
-      mutate(GEOID = as.numeric(GEOID)),
-    by = c("Census Tract" = "GEOID")
-  )
 ces4_map <- ces4_clean %>%
   left_join(
     ca_tracts %>%
@@ -117,10 +103,10 @@ bay_ces4_map_sm <- ces4_map[ces4_map$`California County`== "San Mateo",]
 bay_ces4_map_s <- ces4_map[ces4_map$`California County`== "Sonoma",]
 
 
-fin_bay_ces4_map <- rbind(bay_ces4_map_a,bay_ces4_map_n,bay_ces4_map_sc,bay_ces4_map_cc,bay_ces4_map_sf,bay_ces4_map_s,bay_ces4_map_m,bay_ces4_map_sm,bay_ces4_map_s)
+fin_bay_ces4 <- rbind(bay_ces4_map_a,bay_ces4_map_n,bay_ces4_map_sc,bay_ces4_map_cc,bay_ces4_map_sf,bay_ces4_map_s,bay_ces4_map_m,bay_ces4_map_sm,bay_ces4_map_s)
 
-fin_bay_ces4_map <- fin_bay_ces4_map %>%
-  select(!ends_with(c("Ozone","Diesel PM", "Drinking Water","CES 4.0 Score", "CES 4.0 Percentile", "CES 4.0 Percentile Range", "Lead", "Pesticides", "Tox. Release", "Traffic", "Cleanup Sites", "Groundwater Threats", "Haz. Waste", "IMP, Water Bodies", "Solid Waste", "Pollution Burden", "Low Birth Weight", "Cardiovascular Disease", "Education", "Linguistic Isolation", "Poverty", "Unemployment", "Housing Burden")))
+fin_bay_ces4_map <- fin_bay_ces4 %>%
+  select(!ends_with(c("Ozone","Diesel PM", "Drinking Water","CES 4.0 Score", "CES 4.0 Percentile", "CES 4.0 Percentile Range", "Lead", "Pesticides", "Tox. Release", "Traffic", "Cleanup Sites", "Groundwater Threats", "Haz. Waste", "IMP, Water Bodies", "Solid Waste", "Pollution Burden", "Low Birth Weight", "Cardiovascular Disease", "Education", "Linguistic Isolation", "Poverty", "Unemployment", "Housing Burden", "Longitude", "Latitude", "IMP. Water Bodies", "Pollution Burden Score", "Pop. Char.", "Pop. Char. Score")))
 # Question 1
 
 mapview(fin_bay_ces4_map, zcol= "Asthma")
@@ -189,11 +175,6 @@ ggplot(
 # Rep Q3
 
 model_log <- lm(log(Asthma) ~ PM2.5, fin_bay_ces4_map)
-```
-
-
-```{r}
-#Question 5 need comment V
 ```
 
 ```{r}
