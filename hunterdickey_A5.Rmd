@@ -67,7 +67,7 @@ ces4_clean <- ces_data_4 %>%
   select(!ends_with("Pctl"))
 
 
-ca_tracts <- tracts("CA")
+ca_tracts <- tracts("CA", cb = T, progress_bar = F)
 
 ces4_map <- ces4_clean %>%
   left_join(
