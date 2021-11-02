@@ -196,3 +196,41 @@ logit_model <- glm(
 
 print(summary(logit_model))
 ```
+
+```{r}
+#prediction 
+
+sf_pums_clean <- sf_pums_clean %>% 
+  mutate(
+    family = BLD %>% 
+      factor(
+        levels = sf_pums_clean$BLD %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    tenure = TEN %>% 
+      factor(
+        levels = sf_pums_clean$TEN %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    moving_yr = MV %>% 
+      factor(
+        levels = sf_pums_clean$MV %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+     PUMA = as.factor(PUMA)
+  )
+
+model_sample <- sample_n(sf_pums_clean, 1, replace = TRUE)
+
+print(predict(logit_model, model_sample, type = "response"))
+
+
+```
+
+The predictor variables here are the number of families in the building, home ownership vs. rental status, and the moving year/time in the household. The logistic regression model predicted a roughly .05 probability for there to be lead risk for a family in a detached one-family house, who are renters, having lived in the home for 10 to 19 years in the PUMA ID: 07506. *NOTE: The printed "model_sample" result alters the probability each time as it re samples. This is why the prediction number does not show my chosen analysis sample. This said, the re sampling example demonstrates that the prediction mechanism does in fact work. 
