@@ -1,0 +1,204 @@
+---
+title: "hunterdickey_A5"
+author: "Hunter Dickey"
+date: "10/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+
+```{r}
+library(tidyverse)
+library(censusapi)
+library(sf)
+library(mapview)
+library(tigris)
+library(readxl)
+library(leaflet)
+
+
+Sys.setenv(CENSUS_KEY="c8aa67e4086b4b5ce3a8717f59faa9a28f611dab")
+
+ces_data_4 <- read_excel("calenviroscreen40resultsdatadictionary_F_2021.xlsx")
+
+```
+
+Question 1: 
+
+The Bay Asthma Map shows high concentrations in and around the inner bay ring from the Peninsula (Palo Alto, San Mateo, and San Francisco) to the Northern and Western borders of the East Bay Area. This Asthma data is the spatially modeled and age-adjusted rate of ED (emergency room) visits per 10,000 individuals over the years of 2015-2017.
+
+The Bay PM2.5 Map shows a significantly higher presence in the bay area than Asthma. That said, the concentrations of PM2.5 in the bay follow a similar trend to the Asthma data in that they also appear highest around the inner coast of the Peninsula across the Palo Alto, San Mateo, and San Francisco Area, while becoming even more increasingly prevalent in the East bay in around Alameda, particular along its Western coastline. There is also an interestingly high pocket of measured PM2.5 in Napa county. 
+The collected data, according to Calenviroscreen, is measured as the 'Annual mean concentration of Bay area PM2.5--that is, the 'weighted average of measured monitor concentrations and satellite observations (of) µg/m3'--from 2015-2017. 
+
+Question 2:
+
+the Asthma-PM2.5 data, when plotted behind a best-fit line appears as a boat-like shape, with a significant portion making up the boat body itself and another line of data perched like a sail and mast. The regression line does not appear to fit the data well and appears to be pulled upwards in the positive slope direction by this cluster of "sail" data points in the graph.
+
+Question 3: 
+In layman's terms, the relationship between PM2.5 levels and Asthma levels in the bay area appears significant with a p-value of practically 0 for our intents and purposes. The residual min and max values are not symmetrical (-48.453 and 178.672 respectively) which calls into question the normality of the distribution. Per the r-squared result, the variation in PM2.5 levels explains 9.6% of the variation in Bay Asthma levels. Finally, an increase of 1 in PM2.5-scores/levels is associated with a 15.33 point increase in Asthma levels/scores.  
+
+Question 4:
+The residuals density plot has a significant right tail or skew which calls into question the plot's normality. Further, the plot is bimodal and not particularly centered around zero, which means it needs to be normalized to mitigate much of this skew. I find this pattern interesting as we are not using any binary variables here. 
+
+After repeating steps 2-3 under the log() criteria:
+
+Question 2(repeated):
+  the Asthma-PM2.5 data, when plotted along with a best-fit line appears far more regular in shape. The upward trending "sail" data I spoke of earlier is far tamer in this distribution, with a more regular shape in my opinion. The data still does not show but the slightest positive trend in my eyes, which calls into question the strength of the correlation we are observing.
+  
+Question 3(repeated):
+
+Again, the relationship between PM2.5 levels and Asthma levels in the bay area appears significant with a p-value of essentially 0. The residual min and max values are not symmetrical, although smaller in value, (-1.99922 and 0.40092 respectively) which still calls slightly into question the normality of the distribution. Per the r-squared result, the variation in PM2.5 levels explains 8.5% of the variation in Bay Asthma levels. Finally, an increase of 1 in PM2.5-scores/levels is associated with an increase of .27 increase in Asthma levels/scores, per the re-ran regression. 
+
+Question 5:
+The new residuals density is centered around zero and normalized; however, it is still bimodal. 
+
+I determined that the census tract with the most negative "residual" is actually manifest as a tie between two Stanford tracts (6085513000 and 6085511608) in Santa Clara County. 
+
+A negative residual means that the model overestimated the actual observation. This means that the model overestimated the number of people with Asthma in this census tract based on the aggregated Bay area data. In Stanford's case, this may be an overestimation as the residents here do not live in the Bay Area full time and do not represent the asthma/PM2.5 level association as accurately as other full-time residents would. In other words, Stanford is a diverse, young, and geographically transient population which may explain why the model would predict a higher 'Asthma' value than what is observed. 
+
+```{r}
+
+# mutate function
+
+ces4_clean <- ces_data_4 %>%
+  select(!ends_with("Pctl"))
+
+
+ca_tracts <- tracts("CA", cb = T, progress_bar = F)
+
+ces4_map <- ces4_clean %>%
+  left_join(
+    ca_tracts %>%
+      transmute(GEOID = as.numeric(GEOID)),
+    by = c("Census Tract" = "GEOID")
+  ) %>% 
+st_as_sf()
+#st_as_sf makes some data a spatial object 
+
+bay_counties <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+
+bay_ces4_map_a <- ces4_map[ces4_map$`California County`== "Alameda",]
+bay_ces4_map_n <- ces4_map[ces4_map$`California County`== "Napa",]
+bay_ces4_map_sc <- ces4_map[ces4_map$`California County`== "Santa Clara",]
+bay_ces4_map_cc <- ces4_map[ces4_map$`California County`== "Contra Costa",]
+bay_ces4_map_sf <- ces4_map[ces4_map$`California County`== "San Francisco",]
+bay_ces4_map_s <- ces4_map[ces4_map$`California County`== "Solano",]
+bay_ces4_map_m <- ces4_map[ces4_map$`California County`== "Marin",]
+bay_ces4_map_sm <- ces4_map[ces4_map$`California County`== "San Mateo",]
+bay_ces4_map_s <- ces4_map[ces4_map$`California County`== "Sonoma",]
+
+
+fin_bay_ces4 <- rbind(bay_ces4_map_a,bay_ces4_map_n,bay_ces4_map_sc,bay_ces4_map_cc,bay_ces4_map_sf,bay_ces4_map_s,bay_ces4_map_m,bay_ces4_map_sm,bay_ces4_map_s)
+
+fin_bay_ces4_map <- fin_bay_ces4 %>%
+  select(!ends_with(c("Ozone","Diesel PM", "Drinking Water","CES 4.0 Score", "CES 4.0 Percentile", "CES 4.0 Percentile Range", "Lead", "Pesticides", "Tox. Release", "Traffic", "Cleanup Sites", "Groundwater Threats", "Haz. Waste", "IMP, Water Bodies", "Solid Waste", "Pollution Burden", "Low Birth Weight", "Cardiovascular Disease", "Education", "Linguistic Isolation", "Poverty", "Unemployment", "Housing Burden", "Longitude", "Latitude", "IMP. Water Bodies", "Pollution Burden Score", "Pop. Char.", "Pop. Char. Score")))
+# Question 1
+
+mapview(fin_bay_ces4_map, zcol= "Asthma")
+
+mapview(fin_bay_ces4_map, zcol= "PM2.5")
+```
+
+
+```{r}
+# Question 2, need comment
+ggplot(
+  data = fin_bay_ces4_map,
+  aes(
+      x = PM2.5,
+      y = Asthma
+    )
+) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+
+```{r}
+#Question 3, regression
+
+model <- lm(Asthma ~ PM2.5, fin_bay_ces4_map)
+summary(model)
+```
+
+```{r}
+slope <- 0
+
+yintercept <- mean(fin_bay_ces4_map$Asthma,na.rm=TRUE)
+
+best_fit_candidate <- slope * fin_bay_ces4_map$PM2.5 + yintercept 
+
+fin_bay_ces4_map$residuals <- fin_bay_ces4_map$Asthma - best_fit_candidate
+
+sumsq_residuals <- sum(fin_bay_ces4_map$residuals, na.rm= TRUE)
+
+sumsq_residuals
+
+```
+
+
+```{r}
+# Question 4, desc whats wrong and repeat 2-3
+plot(density(residuals(model)))
+```
+
+
+```{r}
+# Rep Q 2
+ggplot(
+  data = fin_bay_ces4_map,
+  aes(
+      x = PM2.5,
+      y = log(Asthma)
+    )
+) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+```{r}
+# Rep Q3
+
+model_log <- lm(log(Asthma) ~ PM2.5, fin_bay_ces4_map)
+```
+
+```{r}
+
+ggplot(
+  data = fin_bay_ces4_map,
+  aes(
+      x = PM2.5,
+      y = log(Asthma)
+    )
+) +
+  geom_point() +
+  geom_smooth(method = "lm")
+model_log <- lm(log(Asthma) ~ PM2.5, fin_bay_ces4_map)
+
+plot(density(residuals(model_log)))
+```
+
+```{r}
+#Question 5: Map Residuals
+mapview(fin_bay_ces4_map, zcol= "residuals", na.rm=TRUE)
+
+# min(fin_bay_ces4_map$residuals, na.rm=TRUE)
+# -43.16571
+
+```
+
