@@ -1,0 +1,198 @@
+---
+title: "hunterdickey_A6"
+author: "Hunter Dickey"
+date: "11/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+
+```
+
+```{r}
+setwd("~/Documents/GitHub/hunterdickey.github.io")
+library(tidyverse)
+library(censusapi)
+library(sf)
+library(mapview)
+library(tigris)
+library(readxl)
+library(leaflet)
+getwd()
+
+Sys.setenv(CENSUS_KEY="c8aa67e4086b4b5ce3a8717f59faa9a28f611dab")
+```
+
+```{r}
+# pums_2019_1yr <- getCensus(
+#    name = "acs/acs1/pums",
+#    vintage = 2019,
+#    region = "public use microdata area:*",
+#    regionin = "state:06",
+#    vars = c(
+#     "SERIALNO",
+#      "SPORDER",
+#      "PWGTP",
+#      "WGTP",
+#      "YBL",
+#      "BLD",
+#      "TEN",
+#      "MV",
+#      "HINCP",
+#      "AGEP"
+#    )
+#  )
+# 
+# 
+# saveRDS(pums_2019_1yr, "a6_pums.rds")
+
+pums_2019_1yr <- readRDS("a6_pums.rds")
+```
+
+```{r}
+
+#puma bigger than censu tract smaller than county 
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+sf_boundary <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME == "San Francisco")
+
+
+sf_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[sf_boundary, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+sf_pums <- pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>%
+  filter(PUMA %in% sf_pumas$PUMACE10)
+
+class(sf_pums$YBL)
+```
+
+```{r}
+mapview(sf_pumas)
+
+
+```
+
+```{r}
+# each have puma id 
+#get to logistic regression, even the location can affect prediction 
+  
+# use PUMA ID as a potential explanatory variable 
+```
+
+Step 3
+```{r}
+sf_pums_clean <- sf_pums %>%
+  filter(YBL %in% c("1","2","3"))
+#or 
+#1960 
+sf_pums_clean <- sf_pums %>%
+  filter(YBL %in% as.character(1:3))
+
+unique(sf_pums$YBL)
+
+#want unique serial numbers (youngest person in home, sufficient for at least one kid, for youngest in home, are they a kid around)
+
+sf_pums_clean <- sf_pums %>% 
+  mutate(
+    YBL = as.numeric(YBL),
+    AGE = as.numeric (AGEP),
+    HINCP = as.numeric(HINCP),
+    leadrisk = ifelse(
+      as.numeric(HINCP) < 90000 & 
+        as.numeric(AGEP) < 6, 
+      1, 
+      0
+      ),
+  ) %>%
+  filter(YBL %in% 1:3) %>%
+  arrange(AGEP) %>%
+  group_by(SERIALNO) %>%
+  summarize_all(first)
+
+
+
+# test <- sf_pums_clean %>% filter(SERIALNO == "")
+# row 27 60k and 3 yr old 
+#old way
+# sf_pums_clean$leadrisk <- ifelse(sf_pums_clean$HINCP < 90000 & sf_pums_clean$AGE < 6, 1, 0)
+
+
+#  sf_pums_clean <- sf_pums_clean %>% 
+#   mutate(
+#     leadrisk = ifelse(
+#       as.numeric(HINCP) < 90000 & 
+#         as.numeric(AGEP) < 6, 
+#       1, 
+#       0
+#       )
+#   ) %>%
+#   filter(YBL %in% 1:3) %>%
+#   arrange(AGEP) %>%
+#   group_by(SERIALNO) %>%
+#   summarize_all(first)
+
+# mutate(sf_pums_clean, leadrisk = ifelse(sf_pums_clean$HINCP < 90000 & sf_pums_clean$AGE < 6, 1, 0) )
+
+
+
+
+
+```
+
+Logit Model 
+```{r}
+
+# bar chart factor section 
+
+# BLD- single family vs multi family 
+# TEN- renter vs owner 
+# MV is like moving year ranges window 
+# puma is the geographic 
+sf_pums_clean <- sf_pums_clean %>% 
+  mutate(
+    family = BLD %>% 
+      factor(
+        levels = sf_pums_clean$BLD %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    tenure = TEN %>% 
+      factor(
+        levels = sf_pums_clean$TEN %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    moving_yr = MV %>% 
+      factor(
+        levels = sf_pums_clean$MV %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+     PUMA = as.factor(PUMA)
+  )
+
+
+
+logit_model <- glm(
+  leadrisk ~ family + moving_yr + tenure + PUMA ,
+  family = quasibinomial(),
+  data = sf_pums_clean
+)
+
+print(summary(logit_model))
+```
