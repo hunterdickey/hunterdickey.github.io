@@ -1,0 +1,314 @@
+---
+title: "Matching Excercise"
+author: "Hunter Dickey"
+date: "11/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+rm(list=ls())
+library(tidyverse)
+library(censusapi)
+library(StatMatch)
+
+
+
+Sys.setenv(CENSUS_KEY="c8aa67e4086b4b5ce3a8717f59faa9a28f611dab")
+
+acs_vars_2019_5yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs5",
+    type = "variables"
+  )
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_tracts <-
+  tracts("CA", bay_county_names, cb = T, progress_bar = F)
+
+bay_multiple_tract <- 
+  getCensus(
+    name = "acs/acs5",
+    vintage = 2019,
+    region = "tract:*",
+    regionin = "state:06+county:001,013,041,055,075,081,085,095,097",
+    vars = c(
+      "B06009_001E",
+      "B06009_002E",
+      "B06009_003E",
+      "B19001_001E",
+      "B19001_014E",
+      "B19001_015E",
+      "B19001_016E",
+      "B19001_017E",
+      "B19001A_001E"
+    )
+  ) %>% 
+  transmute(
+    tract = paste0(state, county, tract),
+    perc_college = 1 - (B06009_002E + B06009_003E) / B06009_001E,
+    perc_over100k = (B19001_014E + B19001_015E + B19001_016E + B19001_017E) / B19001_001E,
+    perc_white = B19001A_001E / B19001_001E
+  ) %>% 
+  filter(
+    !is.na(perc_college), 
+    !is.na(perc_over100k),
+    !is.na(perc_white)
+  )
+```
+
+```{r}
+#matrix ensures similar class, the mahalanobis fucnturion requires a matrix as an object and that the things are numeric. 
+
+obs_matrix <-
+  bay_multiple_tract %>% 
+  select(
+    perc_white, 
+    perc_over100k,
+    perc_college
+  ) %>% 
+  as.matrix()
+
+dist_matrix <- mahalanobis.dist(obs_matrix)
+
+# ^ large matrix, remembering the order of things, compare first object to first object, first object to second, first to third, etc
+# what are the units? race, income, education? core is 0.00 (top left), we are doing hair-wise combinations 
+# the third tract (column) is more similar to the second tract than the second is to the first, 
+
+rownames(dist_matrix) <- bay_multiple_tract$tract
+colnames(dist_matrix) <- bay_multiple_tract$tract
+#dataframes special because every column can be more special 
+```
+
+```{r}
+dist_matrix_pairmatch <- dist_matrix
+diag(dist_matrix_pairmatch) <- NA
+
+
+matched_pair_tract <-
+  1:nrow(dist_matrix_pairmatch) %>% 
+  map_dfr(function(x){
+    
+    min_index <- which(dist_matrix_pairmatch[x, ] == min(dist_matrix_pairmatch[x, ], na.rm = T))
+   
+    data.frame(
+      tract = bay_multiple_tract$tract[x],
+      matched_tract = bay_multiple_tract$tract[min_index]
+    )
+    
+  })
+
+
+#min(dist_matrix_pairmatch[x, ], na.rm = T
+# what is dist_matric_pairmatch
+```
+
+```{r}
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  addPolygons(
+    data = bay_tracts %>% 
+      filter(GEOID == matched_pair_tract[2,1])
+  ) %>% 
+  addPolygons(
+    data = bay_tracts %>% 
+      filter(GEOID == matched_pair_tract[2,2])
+  ) %>% 
+  addPolygons(
+    data = bay_tracts %>% 
+      filter(GEOID == matched_pair_tract[3,1]),
+    color = "green"
+  ) %>% 
+  addPolygons(
+    data = bay_tracts %>% 
+      filter(GEOID == matched_pair_tract[3,2]),
+    color = "green"
+  ) %>% 
+  addPolygons(
+    data = bay_tracts %>% 
+      filter(GEOID == matched_pair_tract[4,1]),
+    color = "red"
+  ) %>% 
+  addPolygons(
+    data = bay_tracts %>% 
+      filter(GEOID == matched_pair_tract[4,2]),
+    color = "red"
+  )
+```
+
+```{r}
+mapview(bay_tracts) #use to find specific tract ids 
+
+
+match_set_tract <- dist_matrix["06081611900", ] %>% 
+  as.data.frame() %>%  #turn into a dataframe to manip
+  rownames_to_column() %>% #format
+  rename(
+    tract = rowname,
+    match = "."
+  ) %>% 
+  right_join(
+    bay_multiple_tract #ensure we only deal with contesnt in the orgiginal bay multiple tract
+  ) %>% 
+  arrange(match) %>% 
+  .[1:21, ] %>% 
+  left_join(bay_tracts %>% select(tract = GEOID)) %>% 
+  st_as_sf()
+
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  addPolygons(
+    data = match_set_tract[1, ],
+    color = "red"
+  ) %>% 
+  addPolygons(
+    data = match_set_tract[-1, ]
+  )
+```
+
+
+```{r}
+# Chapter 6.2 (find and replace experiment)
+
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  addPolygons(
+    data = bay_pumas,
+    weight = 1,
+    color = "gray",
+    label = ~PUMACE10
+  ) %>% 
+  addMarkers(
+    lng = -121.9415017,
+    lat = 37.502171 #literally go to google maps, find it, right click on the bottom of the red marker lng is usually -121 and lat is usually 37
+  ) %>% 
+  addPolygons(
+    data = bay_pumas %>% 
+      filter(PUMACE10 == "08504")
+  )
+
+```
+
+```{r}
+pums_2014_2019 <-
+  2014:2019 %>% 
+  map_dfr(function(year){
+    
+    getCensus(
+      name = "acs/acs1/pums",
+      vintage = year,
+      region = "public use microdata area:*", 
+      regionin = "state:06",
+      vars = c(
+        "SERIALNO",
+        "SPORDER",
+        ifelse(
+          year == 2019,
+          "JWTRNS",
+          "JWTR"
+        ),
+        "PWGTP",
+        paste0("PWGTP",1:80)
+      )
+    ) %>% 
+      mutate(
+        year = year,
+        PUMA = public_use_microdata_area %>% str_pad(5,"left","0")
+      ) %>% 
+      filter(
+        PUMA %in% bay_pumas$PUMACE10
+      ) %>% 
+      rename(
+        JWTR = ifelse(
+          year == 2019,
+          "JWTRNS",
+          "JWTR"
+        )
+      )
+    
+  })
+  
+pums_bart <- pums_2014_2019 %>%
+  mutate(
+    PWGTP = as.numeric(PWGTP),
+    bart = ifelse(
+      JWTR %in% c("4"),
+      PWGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA, year) %>% 
+  summarize(
+    pop = sum(PWGTP),
+    bart = sum(bart)
+  )
+# Before moving on, let’s look at the distribution of population and BART commuters in the Bay Area PUMAs, which might give further insights to how best to construct the difference-in-differences analysis. We’ll arbitrarily pick 2017 to view one slice of time.
+
+
+pums_pal <- colorNumeric(
+  palette = "YlOrRd",
+  domain = pums_bart %>% 
+    filter(year == 2017) %>% 
+    pull(pop)
+)
+
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  addPolygons(
+    data = pums_bart %>% 
+      filter(year == 2017) %>% 
+      right_join(bay_pumas %>% select(PUMA = PUMACE10)) %>% 
+      st_as_sf(),
+    fillColor = ~pums_pal(pop),
+    color = "white",
+    weight = 1,
+    fillOpacity = 0.5,
+    label = ~paste0(PUMA,": Population ", pop)
+  )
+
+```
+
