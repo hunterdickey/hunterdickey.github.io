@@ -10,7 +10,17 @@ knitr::opts_chunk$set(echo = F, warning = F, message = F)
 ```
 
 
-Treated:time is the "difference-in-differences" result and is statistically significant with a p-value of .017. The addition of the Antioch BART appears to have contributed 967.52 new BART commuters. 
+Treated:time is the "difference-in-differences" result and is statistically significant with a p-value of .017. The addition of the Antioch BART appears to have contributed 967.52 new BART commuters. This said, the other 'terms' are treated and time which describe "baseline" effects in the relationship. Treated is the difference between the treatment and control PUMAs(the average vertical difference between the two lines before the BART station's founding). Time represents the "change in the control PUMAs  from pre-treatment to post-treatment". What these definitions imply is that they are controlled for, or that our variable of interest (Treated:time) only highlights the difference outside of these controlled variable results. 
+
+Further, as noted in the textbook, the variable/outcome "bart" may not best measure the causal effect of a BART station in the Bay. For instance, perhaps the primary populations using the station arrives in this location rather than leaving from it (which is what we measured). It could also be that confining the noted commuters leaves out the general "ridership" that uses the system for leisure or general travel. 
+
+Another point is that this study operates under the assumption that the ACS respondents selected "subway or elevated car" as a representation for BART trips. 
+
+Because of data available and how new the Antioch BART is, the effects(long term) may not be fully realized or settled at this point in time. 
+
+PUMAs generally are quite large, possibly too large to capture specific effects relevant to this analysis. We also don't capture much of the bay area and therefore may be missing large and relevant commuter populations in other PUMAs. 
+
+This initial analysis does not use replicate weights to adjust/minimize standard error and see a more significant relationship. 
 ```{r}
 library(tidyverse)
 library(censusapi)
@@ -178,10 +188,6 @@ leaflet() %>%
 ```
 
 
-```{r}
-
-
-```
 
 ```{r}
 #clean 
@@ -281,7 +287,7 @@ rbind(
   geom_line() +
   geom_vline(xintercept = 2018, linetype = "dashed") +
   labs(
-    title = "Antioch vs. control neighborhoods, BART ridership",
+    title = "Brentwood & Oakley Cities PUMA vs. control neighborhoods, BART ridership",
     x = "Year",
     y = "BART commute riders"
   )
