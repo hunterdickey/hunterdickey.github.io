@@ -5,11 +5,13 @@ date: "10/6/2021"
 output: html_document
 ---
 
-In this assignment, I used the latest (2019) PUMS data to map the Bay Area's low income households with elderly residents (age >= 60). I chose this subset of the Bay Area population as it highlights two major factors that may contribute to and exacerbate extreme heat impacts: financial resource availability and age. 
+In this assignment, I used the latest (2019) PUMS data to map the Bay Area's  elderly working residents (age >= 60). I chose this subset of the Bay Area population as it highlights two major factors that may contribute to and exacerbate extreme heat impacts: age and employment. 
 
-Based on the insights we reviewed this past week in class (10/05 & 10/07) the elderly are a population group that is typically at higher risk to extreme heat-related illness than the younger populations. Moreover, I assume that lower-income communities may also be at a higher risk of experiencing extreme heat's adverse effects relative to their wealthier counterparts. Simply, I hold that this higher-risk assumption is because this subgroup has lower levels of household income, which may hinder its members' ability to purchase heat mitigation tools. 
+Based on the insights we reviewed (10/05 & 10/07), the elderly are a population group that is typically at higher risk to extreme heat-related illness relative to younger populations. Moreover, I assume that employed elderly individuals may also be at a higher risk of experiencing extreme heat's adverse effects relative to their retired or cared-for counterparts. Simply, I hold that this higher-risk assumption is because this subgroup may be more active/present in the stress of working environments or physically strenuous activity, which may expose them to increased heat exposure--as a factor of their jobs (travelling/working outdoor/stressful indoor environments)--relative to their retired peers.  
 
-The PUMS map highlights the distribution of low income households with elderly members in the Bay Area. This map could be useful for narrowing down which census blocks and communities have significantly higher concentrations of these at-risk households. According to my findings, there are 412612 households in the Bay Area that fall under the "low income with elderly members (>=60)" criteria that I set. With that figure in mind, to truly help these communities during episodes of extreme heat in the area, I think that this type of map would have to be much more precise and granular within the darker color/higher percentage blocks it features. At the moment, I believe that this map is a good starting point; but, that it lacks the specificity needed to mobilize significant action to help this particular sub population of Bay Area households. 
+The PUMS map highlights the distribution of households with elderly working members in the Bay Area. This map could be useful for narrowing down which census blocks and communities have significantly higher concentrations of these at-risk households. According to my findings, there are, at a minimum, 501607 working elderly individuals/headed households in the Bay Area with age >=60 per the criteria that I set. With a bay population of roughly 7.7 million, and individuals over the age of 65 totaling roughly 13.6% of the population (~1047200), This figure would not be out of the realm of possibility, statistically speaking. 
+
+With that figure in mind, to truly help these communities during episodes of extreme heat in the area, I think that this type of map would have to be much more precise and granular within the darker color/higher percentage blocks it features. At the moment, I believe that this map is a good starting point for locating general communities; but, that it lacks the specificity needed to mobilize significant action to help this particular sub-population of Bay Area households. 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = F, warning = F, message = F)
 ```
@@ -61,7 +63,9 @@ pums_2019_1yr <- getCensus(
     "HHL",
     "HINCP",
     "R60",
-    "R65"
+    "R65",
+    "WKWN",
+    "NPP"
   )
 )
 
@@ -112,17 +116,18 @@ bay_pums_example <-
   filter(!duplicated(SERIALNO)) %>% 
   mutate(
     WGTP = as.numeric(WGTP),
-    lowinc_elderly_in_home= ifelse(
+    elderly_work= ifelse(
       (R60 >= 1) &
-        (HINCP < 100000),
+        (NPP = 1) &
+        (WKWN != 0),
       WGTP,
       0
     )
   ) %>% 
   group_by(PUMA) %>% 
   summarize(
-    perc_lowinc_elderly_in_home =
-      sum(lowinc_elderly_in_home, na.rm =T)/sum(WGTP, na.rm = T)*100
+    elderly_work =
+      sum(elderly_work, na.rm =T)/sum(WGTP, na.rm = T)*100
   ) %>% 
   left_join(
     bay_pumas %>% 
@@ -130,27 +135,28 @@ bay_pums_example <-
     by = c("PUMA" = "PUMACE10")
   ) %>% 
   st_as_sf()
+
 ```
 
 
 ```{r}
 pums_pal <- colorNumeric(
   palette = "Oranges",
-  domain = bay_pums_example$perc_lowinc_elderly_in_home
+  domain = bay_pums_example$elderly_work
 )
 
 leaflet() %>%
   addTiles() %>% 
   addPolygons(
     data = bay_pums_example,
-    fillColor = ~pums_pal(perc_lowinc_elderly_in_home),
+    fillColor = ~pums_pal(elderly_work),
     color = "white",
     opacity = 0.5,
     fillOpacity = 0.5,
     weight = 1,
     label = ~paste0(
-      round(perc_lowinc_elderly_in_home), 
-      "% Households with elderly residents making less than $100K"
+      round(elderly_work), 
+      "% Households with working elderly residents"
     ),
     highlightOptions = highlightOptions(
       weight = 2,
@@ -160,8 +166,8 @@ leaflet() %>%
   addLegend(
     data = bay_pums_example,
     pal = pums_pal,
-    values = ~perc_lowinc_elderly_in_home,
-    title = "% Households<br>with elderly residents<br>making less than $100K"
+    values = ~elderly_work,
+    title = "% Households<br>with working<br>elderly residents"
   )
 
 ```

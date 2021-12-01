@@ -1,0 +1,13 @@
+name: shinyhubexample
+title: shinyhubexample
+username:
+account: hunterdickey
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5200555
+bundleId: 5290685
+url: https://hunterdickey.shinyapps.io/shinyhubexample/
+when: 1637799237.15908
+lastSyncTime: 1637799237.15909
+asMultiple: FALSE
+asStatic: FALSE
