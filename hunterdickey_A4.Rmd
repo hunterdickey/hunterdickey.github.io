@@ -59,6 +59,7 @@ race_categories <- c(
 )
 
 
+
 bay_edu_race_2019 <- 
   1:7 %>%
   map_dfr(function(x) {

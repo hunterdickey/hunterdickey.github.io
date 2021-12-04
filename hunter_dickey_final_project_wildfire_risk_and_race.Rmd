@@ -1,0 +1,951 @@
+---
+title: "Final Project: Wildfire Risk and Race in the Bay Area"
+author: "Hunter Dickey"
+date: "12/6/2021"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+OVERVIEW: 
+This exploratory project aims to evaluate variables, as measurable by the US Government's American Community Survey (ACS), that may contribute to people's and particular demographics' risk's related to wildfires in and around the Bay Area. Further, this assessment explores racial disparities within these risk variables. As a motivating premise, the recent Dixie fire being categorized as one of, if not the, largest burning fire in California history sparked this project. 
+
+This project is divided into four distinct sections: plotting racial disparities of selected risk variables, mapping these disparities, performing a logistic regression evaluating if particular PUMA/geographic locations are correlated with higher wildfire risk, and finally mapping the Bay Area's Fire history/high risk geographies. 
+
+Defining RISK:
+
+For the intents and purposes of my project, wildfire riskiness will be characterized by the following baseline variables from the ACS: household income, the presence/lack of adequate fire insurance, the presence/lack of health insurance, and vehicle availability to responding households. 
+
+I chose household income as available finances may aid households in escaping, preventing, or mitigating wildfire destruction or burdens.  
+
+I chose the presence/lack of health insurance, as this puts an individual at a higher risk of death, burden, or injuries due to wildfire-related complications. This risk indicator may be reflective of their financial situation. 
+
+I chose the presence/lack of fire insurance because a lack of adequate fire insurance (coverage below 1000 dollars annually) places individuals at direct risk of wildfire burdens relative to their better-covered neighbors/peers. 
+
+I chose vehicle availability as households with vehicles may be able to evade/escape wildfires or help fight/mitigate fire more effectively than their less-mobile counterparts.  
+
+EXPLORATION 1: PLOTTING DISPARITIES 
+
+GOAL:
+To plot a baseline and general understanding of how each of these factors that may influence wildfire risk in the Bay Area breakdown by race. 
+
+```{r}
+Sys.setenv(CENSUS_KEY="d606b444d6d806f3ba91342926b0e6e9356b2501")
+
+library(censusapi)
+library(tidyverse)
+library(tigris)
+library(sf)
+library(leaflet)
+library(mapview)
+
+```
+
+```{r}
+
+acs_vars_2019_1yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs1",
+    type = "variables"
+  )
+
+acs_vars_2019_5yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs5",
+    type = "variables"
+  )
+
+
+race_categories <- c(
+  "White alone",
+  "Black or African American alone",
+  "American Indian and Alaska Native alone",
+  "Asian alone",
+  "Native Hawaiian and Other Pacific Islander alone",
+  "Some Other Race alone",
+  "Two or more Races"
+)
+
+```
+
+```{r}
+#income disparity 
+bay_income_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(B19001",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "income"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(income)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+bay_race_total <-
+  bay_income_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(income = "Total")
+
+bay_income_race_2019 %>% 
+  group_by(income, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = income %>% factor(levels = rev(c("Total",unique(bay_income_race_2019$income)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_income_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household Income",
+    y = "Proportion of Households",
+    title = "Bay Area Household Income by Race",
+    fill = "Race of Householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+
+Regarding household income there is a clear trend that, largely, as income level increases across the bay area, White and Asian populations are more and more represented, eventually being over representative at incomes over $200,000 annually. In juxtaposition, African Americans, American Indians, and the other race category(including non-white Hispanics) all become more underrepresented as income increases.   
+
+```{r}
+
+race_categories <- c(
+  "White alone",
+  "Black or African American alone",
+  "American Indian and Alaska Native alone",
+  "Asian alone",
+  "Native Hawaiian and Other Pacific Islander alone",
+  "Some Other Race alone",
+  "Two or more Races"
+)
+
+#health disparity 
+bay_healthin_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(C27001",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, NA, "HealthIn"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(HealthIn)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+
+bay_race_total <-
+  bay_healthin_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(income = "Total")
+
+bay_healthin_race_2019 %>% 
+  group_by(HealthIn, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = HealthIn %>% factor(levels = rev(c("Total",unique(bay_healthin_race_2019$HealthIn)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_healthin_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Health Insurance Coverage",
+    y = "Proportion of Households",
+    title = "Bay Area Household Health Coverage by Race",
+    fill = "Race of Householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+
+Regarding Healthcare coverage, this simple race-composition plot demonstrates that White, Asian, and Black respondents in the Bay area are under represented in the no healthcare coverage, which is good; however, there is a glaring over representation in the Other Race category.   
+
+```{r}
+bay_transportation_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(B08105",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "Transportation"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(Transportation)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+
+bay_race_total <-
+  bay_transportation_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(Transportation = "Total")
+
+bay_transportation_race_2019 %>% 
+  group_by(Transportation, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = Transportation %>% factor(levels = rev(c("Total",unique(bay_transportation_race_2019$Transportation)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_transportation_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household Transportation Method",
+    y = "Proportion of Households",
+    title = "Bay Area Household Transportation Method by Race",
+    fill = "Race of Householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+
+```
+For transportation methods, white Bay residents are considerably over represented in the worked from home the "Taxicab, motorcycle, bicycle, or other means" categories whereas African Americans are over represented in the "public transportation category. The "Other Races" category is overrepresented in the "carpooling category".
+
+```{r}
+bay_poverty_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(B17020",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "poverty"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(poverty)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+
+bay_race_total <-
+  bay_poverty_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(poverty = "Total")
+
+bay_poverty_race_2019 %>% 
+  group_by(poverty, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = poverty %>% factor(levels = rev(c("Total",unique(bay_poverty_race_2019$poverty)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_poverty_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household income above or below the poverty line",
+    y = "Proportion of households",
+    title = "Bay Area household poverty proportion by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+For the poverty-level race plot, African Americans, Native Americans, and "Other Races" are overrepresented in the 'below poverty line analysis, whereas the same can be said for White and Asian bay residents at or above the poverty line. 
+
+
+
+
+EXPLORATION 2: MAPPING DISPARITIES 
+
+GOAL:
+To map the distribution of each of my 'wildfire risk' variables. To reiterate, I will map the PUMS region distributions for the following risk variables: income, lack of health coverage, lack of an accessible vehicle, and what percentage of individuals have fire insurance.   
+```{r}
+
+#setup
+
+pums_2019_1yr <- readRDS("project_pums.rds")
+
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <-
+  pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+
+```
+```{r}
+bay_pums_low_income <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    poverty= ifelse(
+      (POVPIP <= 0),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    poverty =
+      sum(poverty, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Purples",
+  domain = bay_pums_low_income$poverty
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_low_income,
+    fillColor = ~pums_pal(poverty),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(poverty), 
+      "% Households at or below the poverty line"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_low_income,
+    pal = pums_pal,
+    values = ~poverty,
+    title = "% Households at or <br>below the<br>poverty line"
+  )
+
+```
+There appear to be possibly significant pockets of low income individuals around the bay, in Berkeley, San Jose, San Francisco, Burlingame, and Oakland. 
+
+```{r}
+bay_pums_lacking_health_coverage <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    no_health= ifelse(
+      (HICOV >=2),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    no_health =
+      sum(no_health, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Reds",
+  domain = bay_pums_lacking_health_coverage$no_health
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_lacking_health_coverage,
+    fillColor = ~pums_pal(no_health),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(no_health), 
+      "% Households lacking Health Insurance"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_lacking_health_coverage,
+    pal = pums_pal,
+    values = ~no_health,
+    title = "% Households lacking <br>Health<br>Insurance"
+  )
+```
+There appear to be possibly significant pockets of communities lacking healthcare coverage in Santa Rosa, Richmond, Oakland,  South San Francisco, and Across San Jose down to Morgan Hill and Gilroy. 
+
+```{r}
+
+bay_pums_no_vehicle <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    no_car= ifelse(
+      (VEH < 1),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    no_car =
+      sum(no_car, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+
+
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Oranges",
+  domain = bay_pums_no_vehicle$no_car
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_no_vehicle,
+    fillColor = ~pums_pal(no_car),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(no_car), 
+      "% Households Without an Accessible Vehicle"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_no_vehicle,
+    pal = pums_pal,
+    values = ~no_car,
+    title = "% Households Without <br>an Accessible<br>Vehicle"
+  )
+```
+
+As expected, the concentration of households without access to a vehicle reach upwards of 50% in San Francisco city; however, across the bay area, particularly in the east bay, there are stable populations without access to vehicles (East Bay hovers around 7%-20%) of households. 
+
+```{r}
+
+bay_pums_fire_coverage <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    with_fire_coverage= ifelse(
+      (INSP > 1000),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    with_fire_coverage =
+      sum(with_fire_coverage, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+
+```
+
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Oranges",
+  domain = bay_pums_fire_coverage$with_fire_coverage
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_fire_coverage,
+    fillColor = ~pums_pal(with_fire_coverage),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(with_fire_coverage), 
+      "% Households insured For Fire"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_fire_coverage,
+    pal = pums_pal,
+    values = ~with_fire_coverage,
+    title = "% Households<br>insured<br>for Fire"
+  )
+
+#(https://www.bankrate.com/insurance/homeowners-insurance/wildfire-insurance-california/)
+```
+
+Interestingly, for this fire insurance map, I decided to flip to see what percentage of households are covered, rather than the percentage of those who lack coverage. I was surprised to see that the Bay does not have much coverage above $1000 dollars per year. The most insured Bay Area PUMS, from roughly Berkeley to Brentwood, were still hovering at only about 65% of households properly insured, leaving a significant portion (35%) of households under insured by this project's standards. This was the trend across the Bay Area. 
+
+EXPLORATION 3: LOGISTIC REGRESSION
+
+GOAL:
+Measure if predictor variables (particularly PUMA + Race) significantly effect firerisk. Firerisk, in this analysis, is definitionally low income and uninsured.   
+
+The LOGIT model is interpretable as such:
+
+the deviance residuals show that the distribution is very roughly a good fit model with a similar min and max value (-2.348, 2.849).
+
+race2 (Black or African American alone) is statistically significant, changing the log odds of fire risk .57 (increase).
+
+race3 (Native American alone) is statistically significant, changing the log odds of fire risk -2.13 (decrease).
+
+race7 (Native Hawaiian or Pacific Islander Alone) is statistically significant, changing the log odds of fire risk -1.18914 (decrease).
+
+race8 (Some Other Race alone) is statistically significant, changing the log odds of fire risk -0.59276 (decrease).
+
+
+There is a statistically significant difference between having no vehicles and having up to three, with decreasing fire risk as the unit number of available vehicles increases.  
+
+Not having health coverage was not statistically significant, I imagine because the after effects of fire are not captured in this analysis. 
+
+Finally, living in particular PUMAs, per the presented data, is a statistically significant variable affecting the log odds of fire risk in the bay area. Where one lives is statistically significant in their fire risk, even when controlling for income levels and insurance status. Living in some PUMAs like PUMA00107 may increase one's log odds of fire risk by 2.89 whereas others like PUMA08103 may decrease the log odds of fire risk by 1.25.
+
+```{r}
+library(censusapi)
+library(mapview)
+library(tigris)
+library(readxl)
+library(leaflet)
+library(sf)
+library(tidyverse)
+
+Sys.setenv(CENSUS_KEY="c8aa67e4086b4b5ce3a8717f59faa9a28f611dab")
+
+pums_2019_1yr <- readRDS("project_pums.rds")
+
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <- pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+
+bay_pums_clean <- bay_pums %>% 
+  mutate(
+    HINCP = as.numeric(HINCP),
+    HICOV = as.numeric(HICOV),
+    POVPIP = as.numeric(POVPIP),
+    VEH = as.numeric(VEH),
+    
+    firerisk = ifelse(
+      as.numeric(POVPIP) <= 0 &
+        as.numeric(HINCP) < 90000 &
+        as.numeric(HICOV)>=2, 
+      1, 
+      0
+      ),
+  ) %>%
+  arrange(RAC1P) %>%
+  group_by(SERIALNO) %>%
+  summarize_all(first)
+
+bay_pums_clean <- bay_pums_clean %>% 
+  mutate(
+    race = RAC1P %>% 
+      factor(
+        levels = bay_pums_clean$RAC1P %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    health_coverage = HICOV %>% 
+      factor(
+        levels = bay_pums_clean$HICOV %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    income = HINCP %>% 
+      factor(
+        levels = bay_pums_clean$HINCP %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    vehicle = VEH %>% 
+      factor(
+        levels = bay_pums_clean$VEH %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+      ),
+     PUMA = as.factor(PUMA)
+  )
+
+# B08105A (means of transport)
+# B17020A Poverty 
+# B19001A HINCP 
+# C27001A Health 
+```
+
+```{r}
+logit_model <- glm(
+  firerisk ~ race + health_coverage + vehicle + PUMA,
+  family = quasibinomial(),
+  data = bay_pums_clean
+)
+
+print(summary(logit_model))
+
+```
+
+
+EXPLORATION 4: THE BAY's FIRE HISTORY
+
+GOAL:
+Visualize and plot the geographic history of wildfires in the Bay area from 1992 - 2015). This analysis highlights the Wildfire Hazard Potential data of Bay Area Counties and overlays where these high risk geographies are along with the actual fires that may overlap them.
+
+The base, foundation code, for developing the following plots is thanks to Patrick Baylis's Research on wildfire mapping who created an analysis of Butte county's fire history which i based my code off of in doing a similar analysis of the Bay Area's fire history and risk. 
+
+More information can be found here --> https://www.patrickbaylis.com/blog/2021-01-31-fire-maps/
+```{r}
+library(tidyverse)
+library(sf)
+library(cowplot)
+library(raster)
+library(scales)
+
+knitr::opts_knit$set(message = F, warning = F)
+
+whp <- raster("~/Documents/GitHub/hunterdickey.github.io/fire-maps/whp2020_GeoTIF/whp2020_cnt_conus.tif")
+```
+
+```{r}
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+bay_area_fire_df <- 1:9 %>% map_dfr(function(x) {
+  bay_area_fire_santa_clara <- st_read("~/Documents/GitHub/hunterdickey.github.io/fire-maps/cb_2015_us_county_20m", quiet = T) %>%
+  filter(NAME == bay_county_names[x]) %>%
+  st_transform(proj4string(whp))
+})
+
+
+bay_area_fire_santa_clara <- st_read("~/Documents/GitHub/hunterdickey.github.io/fire-maps/cb_2015_us_county_20m", quiet = T) %>%
+  filter(NAME == "Santa Clara") %>%
+  st_transform(proj4string(whp))
+
+
+whp <- crop(whp, bay_area_fire_df)
+
+
+whp_df <- as.data.frame(whp, xy=TRUE)
+
+ggplot(bay_area_fire_df) + 
+  geom_raster(data = whp_df, mapping = aes(x = x, y = y, fill = whp2020_cnt_conus)) + 
+  geom_sf(fill = NA) + 
+  scale_fill_distiller(palette = "PuBuGn", direction = 1) + 
+  guides(fill = "none") + 
+  theme_map()
+
+```
+This map shows the Wildfire Hazard Potential locations in the bay, as noted by CalFIRE, with increasing blue coloration indicating higher WHP. 
+
+```{r}
+#Finding Fire Perimeters
+perims <- st_read("~/Documents/GitHub/hunterdickey.github.io/fire-maps/fire20_1.gdb/", layer = "firep20_1")
+
+perims_bay <- perims %>% 
+  st_cast("MULTIPOLYGON") %>% # Avoid Unknown WKB type 12 error
+  st_make_valid() %>% # Fixes other possible errors
+  st_transform(st_crs(bay_area_fire_df)) %>% 
+  st_crop(bay_area_fire_df)
+```
+
+
+```{r}
+ggplot(bay_area_fire_df) + 
+  geom_raster(data = whp_df, mapping = aes(x = x, y = y, fill = whp2020_cnt_conus)) + 
+  geom_sf(data = perims_bay, fill = "Orange", colour = NA, alpha = 0.25) + 
+  geom_sf(fill = NA) + 
+  scale_fill_distiller(palette = "PuBuGn", direction = 1) + 
+  guides(fill = FALSE) + 
+  theme_map()
+```
+
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Oranges",
+  domain = bay_pums_fire_coverage$with_fire_coverage
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_fire_coverage,
+    fillColor = ~pums_pal(with_fire_coverage),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(with_fire_coverage), 
+      "% Households insured For Fire"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_fire_coverage,
+    pal = pums_pal,
+    values = ~with_fire_coverage,
+    title = "% Households<br>insured<br>for Fire"
+  )
+```
+
+
+This second map of the bay area (above the fire insurance map for comparison) shows the Wildfire Hazard Potential zones (blue) overlapped with the Bay's contemporary fire history. When compared to the fire insurance indicator, this map highlights a potential issue or inadequacy with the current Bay Area level of coverage for wildfire, particularly Around Sonoma, San Mateo, Santa Clara, and Alameda counties.
+
+
+
+CONCLUDING THOUGHTS
+
+This project helped me to see the disparities in certain ACS variables/aspects of life in the Bay Area between different races, with certain groups being more represented than others across variables and subcaagories within variables, like income. 
+
+Moreover, mapping income, health coverage, transportation method, and fire coverage helped me to see that there are significant overlaps and deficiencies in certain pockets of the Bay Area. In some cases, like that of fire coverage, these differences overlap with real calculable risks, particularly from wildfires, as seen in my Wildfire Hazard Potential and Wildfire occurrence map exercise. 
+
+Finally, my logistic regression analysis backed up some of the rough overlap I observed in my mapping exercise. My predictor variables (race, vehicle accessibility, and PUMA location) demostrated statistically significant effect on fire risk, either increasing or decreasing the log odds of fire risk in the Bay Area.  

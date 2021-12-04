@@ -1,0 +1,997 @@
+---
+title: "Working."
+author: "Hunter Dickey"
+date: "12/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+What factors could make people vulnerable to wildfires: household income HINCP,Fire Insurance INSP, running water RWAT, SMARTPHONE, Telephone service TEL, PUMA, VEH Vehicle available, Health insurance HICOV, POPPIV +/- RAC1P
+
+
+
+household income HINCP
+Fire Insurance INSP
+Health insurance HICOV
+Vehicle available VEH
+Poverty ratio POPPIV
+
+K202002
+K202302
+K202701
+B08014
+B08015
+
+B08105A (means of transport)
+B17020A Poverty 
+B19001A HINCP 
+C27001A Health 
+
+```{r}
+
+Sys.setenv(CENSUS_KEY="d606b444d6d806f3ba91342926b0e6e9356b2501")
+acs_vars_2019_1yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs1",
+    type = "variables"
+  )
+
+```
+
+  
+```{r}
+library(censusapi)
+library(tidyverse)
+library(tigris)
+library(sf)
+library(leaflet)
+library(mapview)
+```
+
+Variable by variable Race Composition 
+```{r}
+race_categories <- c(
+  "White alone",
+  "Black or African American alone",
+  "American Indian and Alaska Native alone",
+  "Asian alone",
+  "Native Hawaiian and Other Pacific Islander alone",
+  "Some Other Race alone",
+  "Two or more Races"
+)
+
+race_categories <- c(
+  "White alone",
+  "Black or African American alone",
+  "American Indian and Alaska Native alone",
+  "Asian alone",
+  "Native Hawaiian and Other Pacific Islander alone",
+  "Some Other Race alone",
+  "Two or more Races"
+)
+
+#income disparity 
+bay_income_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(B19001",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "income"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(income)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+
+bay_race_total <-
+  bay_income_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(income = "Total")
+
+bay_income_race_2019 %>% 
+  group_by(income, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = income %>% factor(levels = rev(c("Total",unique(bay_income_race_2019$income)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_income_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Proportion of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+
+Health Insurance disparity 
+```{r}
+
+race_categories <- c(
+  "White alone",
+  "Black or African American alone",
+  "American Indian and Alaska Native alone",
+  "Asian alone",
+  "Native Hawaiian and Other Pacific Islander alone",
+  "Some Other Race alone",
+  "Two or more Races"
+)
+
+#health disparity 
+bay_healthin_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(C27001",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, NA, "HealthIn"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(HealthIn)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+
+bay_race_total <-
+  bay_healthin_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(income = "Total")
+
+bay_healthin_race_2019 %>% 
+  group_by(HealthIn, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = HealthIn %>% factor(levels = rev(c("Total",unique(bay_healthin_race_2019$HealthIn)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_healthin_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Health Insurance Coverage",
+    y = "Proportion of households",
+    title = "Bay Area household Health Coverage by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+
+Transportation
+```{r}
+bay_transportation_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(B08105",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "Transportation"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(Transportation)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+
+bay_race_total <-
+  bay_transportation_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(Transportation = "Total")
+
+bay_transportation_race_2019 %>% 
+  group_by(Transportation, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = Transportation %>% factor(levels = rev(c("Total",unique(bay_transportation_race_2019$Transportation)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_transportation_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household Transportation Method",
+    y = "Proportion of households",
+    title = "Bay Area household transportation method by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+
+```
+
+
+Poverty Status Indicator 
+```{r}
+bay_poverty_race_2019 <- 
+  1:7 %>%
+  map_dfr(function(x) {
+    
+    temp <- getCensus(
+ name = "acs/acs5",
+ vintage = "2019",
+ region = "county:001,013,041,055,075,081,085,095,097",
+ regionin = "state:06",
+ vars = paste0("group(B17020",LETTERS[x],")")
+) %>%
+  select(ends_with("E") & -c(state,NAME)) %>%
+  summarize_all(sum) %>%
+  pivot_longer(
+    everything(),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_5yr %>%
+      select(name, label)
+    #by = "name" 
+    #or by = c("variable", "name")
+  ) %>%
+  separate(
+    label,
+    into = c(NA, NA, "poverty"),
+    sep = "!!"
+  ) %>%
+  select(-name) %>%
+  filter(!is.na(poverty)) %>%
+  mutate(
+    race = race_categories[x]
+  )
+  })
+
+
+bay_race_total <-
+  bay_poverty_race_2019 %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(poverty = "Total")
+
+bay_poverty_race_2019 %>% 
+  group_by(poverty, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = poverty %>% factor(levels = rev(c("Total",unique(bay_poverty_race_2019$poverty)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(bay_poverty_race_2019$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x = "Household income above or below the poverty line",
+    y = "Proportion of households",
+    title = "Bay Area household poverty proportion by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+
+
+#########################################################
+
+Distribution (mapping these disparities, pums)
+```{r}
+pums_2019_1yr <- readRDS("project_pums.rds")
+
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <-
+  pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+
+```
+
+regions low income poverty line, 
+```{r}
+bay_pums_low_income <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    poverty= ifelse(
+      (POVPIP <= 0),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    poverty =
+      sum(poverty, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+Leaflet
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Purples",
+  domain = bay_pums_low_income$poverty
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_low_income,
+    fillColor = ~pums_pal(poverty),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(poverty), 
+      "% Households at or below the poverty line"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_low_income,
+    pal = pums_pal,
+    values = ~poverty,
+    title = "% Households at or <br>below the<br>poverty line"
+  )
+
+```
+
+health 
+
+```{r}
+
+as.numeric(pums_2019_1yr$HICOV)
+
+
+
+bay_pums_lacking_health_coverage <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    no_health= ifelse(
+      (HICOV >=2),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    no_health =
+      sum(no_health, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+Leaflet
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Reds",
+  domain = bay_pums_lacking_health_coverage$no_health
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_lacking_health_coverage,
+    fillColor = ~pums_pal(no_health),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(no_health), 
+      "% Households lacking Health Insurance"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_lacking_health_coverage,
+    pal = pums_pal,
+    values = ~no_health,
+    title = "% Households lacking <br>Health<br>Insurance"
+  )
+```
+
+transportation 
+
+```{r}
+bay_pums_no_vehicle <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    no_car= ifelse(
+      (VEH < 1),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    no_car =
+      sum(no_car, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+Leaflet
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Oranges",
+  domain = bay_pums_no_vehicle$no_car
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_no_vehicle,
+    fillColor = ~pums_pal(no_car),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(no_car), 
+      "% Households Without an Accessible Vehicle"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_no_vehicle,
+    pal = pums_pal,
+    values = ~no_car,
+    title = "% Households Without <br>an Accessible<br>Vehicle"
+  )
+```
+
+Fire Coverage below average/sufficient coverage
+```{r}
+bay_pums_fire_coverage <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    with_fire_coverage= ifelse(
+      (INSP > 1000),
+      WGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    with_fire_coverage =
+      sum(with_fire_coverage, na.rm =T)/sum(WGTP, na.rm = T)*100
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+
+```
+Leaflet
+```{r}
+pums_pal <- colorNumeric(
+  palette = "Oranges",
+  domain = bay_pums_fire_coverage$with_fire_coverage
+)
+
+leaflet() %>%
+  addTiles() %>% 
+  addPolygons(
+    data = bay_pums_fire_coverage,
+    fillColor = ~pums_pal(with_fire_coverage),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(with_fire_coverage), 
+      "% Households insured For Fire"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = bay_pums_fire_coverage,
+    pal = pums_pal,
+    values = ~with_fire_coverage,
+    title = "% Households<br>insured<br>for Fire"
+  )
+```
+###
+Fire High Risk vs Occurance Map
+```{r}
+
+library(tidyverse)
+library(sf)
+library(cowplot)
+library(raster)
+library(scales)
+
+knitr::opts_knit$set(message = F, warning = F)
+
+whp <- raster("~/Documents/GitHub/hunterdickey.github.io/fire-maps/whp2020_GeoTIF/whp2020_cnt_conus.tif")
+```
+
+```{r}
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+bay_area_fire_df <- 1:9 %>% map_dfr(function(x) {
+  bay_area_fire_santa_clara <- st_read("~/Documents/GitHub/hunterdickey.github.io/fire-maps/cb_2015_us_county_20m", quiet = T) %>%
+  filter(NAME == bay_county_names[x]) %>%
+  st_transform(proj4string(whp))
+})
+
+
+bay_area_fire_santa_clara <- st_read("~/Documents/GitHub/hunterdickey.github.io/fire-maps/cb_2015_us_county_20m", quiet = T) %>%
+  filter(NAME == "Santa Clara") %>%
+  st_transform(proj4string(whp))
+
+
+whp <- crop(whp, bay_area_fire_df)
+
+
+whp_df <- as.data.frame(whp, xy=TRUE)
+
+ggplot(bay_area_fire_df) + 
+  geom_raster(data = whp_df, mapping = aes(x = x, y = y, fill = whp2020_cnt_conus)) + 
+  geom_sf(fill = NA) + 
+  scale_fill_distiller(palette = "PuBuGn", direction = 1) + 
+  guides(fill = "none") + 
+  theme_map()
+
+```
+
+Fire Perimeters
+```{r}
+setwd("~/Documents/GitHub/hunterdickey.github.io")
+perims <- st_read("~/Documents/GitHub/hunterdickey.github.io/fire-maps/fire20_1.gdb/", layer = "firep20_1")
+
+perims_bay <- perims %>% 
+  st_cast("MULTIPOLYGON") %>% # Avoid Unknown WKB type 12 error
+  st_make_valid() %>% # Fixes other possible errors
+  st_transform(st_crs(bay_area_fire_df)) %>% 
+  st_crop(bay_area_fire_df)
+```
+
+Credit: 
+Patrick Baylis's Research on wildfire mapping
+```{r}
+ggplot(bay_area_fire_df) + 
+  geom_raster(data = whp_df, mapping = aes(x = x, y = y, fill = whp2020_cnt_conus)) + 
+  geom_sf(data = perims_bay, fill = "Orange", colour = NA, alpha = 0.25) + 
+  geom_sf(fill = NA) + 
+  scale_fill_distiller(palette = "PuBuGn", direction = 1) + 
+  guides(fill = FALSE) + 
+  theme_map()
+```
+
+Logistical Regression : risk 
+```{r}
+pums_2019_1yr <- readRDS("project_pums.rds")
+
+```
+
+```{r}
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <-
+  pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+
+
+```
+
+```{r}
+mapview(bay_pumas)
+```
+
+```{r}
+bay_pums_clean <- bay_pums %>% 
+  mutate(
+    HINCP = as.numeric(HINCP),
+    HICOV = as.numeric(HICOV),
+    POVPIP = as.numeric(POVPIP),
+    VEH = as.numeric(VEH),
+    firerisk = ifelse(
+      as.numeric(POVPIP) <= 0 &
+        as.numeric(HINCP) < 90000 &
+        as.numeric(HICOV)>=2, 
+      1, 
+      0
+      ),
+  ) %>%
+  arrange(RAC1P) %>%
+  group_by(SERIALNO) %>%
+  summarize_all(first)
+
+
+
+# B08105A (means of transport)
+# B17020A Poverty 
+# B19001A HINCP 
+# C27001A Health 
+```
+
+
+LOGIT MODEL
+
+```{r}
+bay_pums_clean <- bay_pums_clean %>% 
+  mutate(
+    race = RAC1P %>% 
+      factor(
+        levels = bay_pums_clean$RAC1P %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    health_coverage = HICOV %>% 
+      factor(
+        levels = bay_pums_clean$HICOV %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    income = HINCP %>% 
+      factor(
+        levels = bay_pums_clean$HINCP %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    vehicle = VEH %>% 
+      factor(
+        levels = bay_pums_clean$VEH %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+      ),
+     PUMA = as.factor(PUMA)
+  )
+
+```
+
+```{r}
+logit_model <- glm(
+  firerisk ~ race + health_coverage + vehicle + PUMA,
+  family = quasibinomial(),
+  data = bay_pums_clean
+)
+
+print(summary(logit_model))
+
+```
+
+
+
+
+
+
+
+
+
+
+Logistical Regression : risk 
+```{r}
+pums_2019_1yr <- readRDS("project_pums.rds")
+
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(cowplot)
+library(raster)
+library(scales)
+library(censusapi)
+library(tigris)
+library(leaflet)
+library(mapview)
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+ 
+sf_boundary <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME == "San Francisco")
+
+sf_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[sf_boundary, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+sf_pums <- pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>%
+  filter(PUMA %in% sf_pumas$PUMACE10)
+
+
+```
+
+```{r}
+mapview(sf_pumas)
+```
+
+```{r}
+sff_pums_clean <- sf_pums %>% 
+  mutate(
+    HINCP = as.numeric(HINCP),
+    HICOV = as.numeric(HICOV),
+    POVPIP = as.numeric(POVPIP),
+    VEH = as.numeric(VEH),
+    firerisk = ifelse(
+      as.numeric(POVPIP) <= 0 &
+        as.numeric(HINCP) < 90000 &
+        as.numeric(HICOV)>=2, 
+      1, 
+      0
+      ),
+  ) %>%
+  arrange(RAC1P) %>%
+  group_by(SERIALNO) %>%
+  summarize_all(first)
+
+
+
+# B08105A (means of transport)
+# B17020A Poverty 
+# B19001A HINCP 
+# C27001A Health 
+```
+
+
+LOGIT MODEL
+
+```{r}
+sff_pums_clean <- sff_pums_clean %>% 
+  mutate(
+    race = RAC1P %>% 
+      factor(
+        levels = sff_pums_clean$RAC1P %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    health_coverage = HICOV %>% 
+      factor(
+        levels = sff_pums_clean$HICOV %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    income = HINCP %>% 
+      factor(
+        levels = sff_pums_clean$HINCP %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+     PUMA = as.factor(PUMA)
+  )
+
+```
+
+```{r}
+logit_model <- glm(
+  firerisk ~ race + health_coverage + Veh + PUMA,
+  family = quasibinomial(),
+  data = sff_pums_clean
+)
+
+summary(logit_model)
+
+```
+

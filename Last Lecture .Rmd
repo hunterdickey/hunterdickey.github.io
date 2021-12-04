@@ -1,0 +1,191 @@
+---
+title: "Last lecture"
+author: "Hunter Dickey"
+date: "12/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(censusapi)
+library(tidyverse)
+library(tigris)
+library(sf)
+library(leaflet)
+library(mapview)
+```
+
+```{r}
+(-122.31375523717293, 37.55340248957148)
+
+point <-
+  c(-122.31375523717293, 37.55340248957148) %>%
+  st_point() %>%
+  st_sfc() %>%
+  st_set_crs(4326) #the google coordinate system 
+
+mapview(point)
+
+buffer <- point %>% 
+  st_transform(26910) %>%
+  st_buffer(1600)
+
+buffer <- st_buffer(point, 1600)
+
+smc_tracts <- tracts("CA", "San Mateo")
+
+mapview(smc_tracts) + mapview(buffer)
+
+subset_tracts <- buffer %>%
+  st_transform(st_crs(smc_tracts)) %>%
+  smc_tracts[.,]
+
+mapview(subset_tracts)
+
+subset_tracts_center <- smc_tracts %>%
+  st_centroid() %>%
+  st_transform(26910) %>%
+  .[buffer,]
+
+
+subset_tracts_intersect <- smc_tracts %>%
+  st_transform(26910)
+  st_intersection(buffer)
+  
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+
+library(readxl)
+
+temp <- tempfile()
+download.file("https://oehha.ca.gov/media/downloads/calenviroscreen/document/calenviroscreen40resultsdatadictionaryf2021.zip",destfile = temp)
+
+ces4 <- read_excel("calenviroscreen40resultsdatadictionary_F_2021.xlsx", 
+  sheet = "CES4.0FINAL_results"
+)
+
+
+unlink(temp)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+ca_tracts <- tracts("CA", cb = T, progress_bar = F)
+
+ces4_bay_pm25 <-
+  ces4 %>% 
+  filter(`California County` %in% bay_county_names) %>% 
+  select(`Census Tract`, PM2.5, `Total Population`) %>% 
+  left_join(
+    ca_tracts %>% 
+      transmute(GEOID = as.numeric(GEOID)), 
+    by = c("Census Tract" = "GEOID")
+  ) %>% 
+  st_as_sf()
+
+smc_population <-
+  getCensus(
+    name = "acs/acs5",
+    vintage = 2019,
+    region = "tract:*", 
+    regionin = "state:06+county:081",
+    vars = "B01001_001E"
+  ) %>% 
+  mutate(
+    tract = paste0(state, county, tract) %>% as.numeric()
+  )
+
+ces4_pop <- ces4_bay_pm25 %>% 
+  right_join(
+    smc_population %>% 
+      select(`Census Tract` = tract, pop = B01001_001E)
+  )
+#lot of NAs here, 
+# just because there are tracts not in san mateo, youre only lookiong for san mateo 
+# left joinkept the characteristic of the big thing (the bay)
+# right join, makes it filter down. 
+
+mapview(ces4_pop, zcol = "pop", na.rm= T)
+
+
+
+sum(ces4_pop$`Total Population`)
+
+# regression 
+# compare to 
+# vars, income, socieoecon, language, grab vars == the social characteristic you are interested in, 
+
+
+
+smc_tracts <- ca_tracts %>% 
+  filter(COUNTYFP == "081")
+
+places <- places("CA")
+
+places_example <- places %>% 
+  filter(NAME %in% c("East Palo Alto", "Menlo Park"))
+
+mapview(smc_tracts)
+
+mapview(places_example)
+
+smc_tracts_places_join <- smc_tracts %>%
+  st_join(places_example)
+
+
+join <- places_example %>% #super overlap, not useful 
+  st_join(smc_tracts)
+
+#st_join is practically a left join 
+mapview(join)
+mapview(smc_tracts_places_join)
+
+smc_tracts_places_join %>%
+  filter(!is.na(NAME.y))%>%
+  mapview()
+
+deduplicate <- join %>%
+  filter(!duplicated(NAME.x))
+
+# (period where NAME.x)
+#paste() in the !
+mapview(deduplicate)
+
+#!duplicated(paste()) to do 
+
+
+#.x came from left, .y from right 
+#started with tracts and st.joined the smaller places, only the census tracts touching meno or east PA affected, have place and tract data, 
+# just want tract and what matching place was 
+  #name.y is just meno land EPA 
+```
+

@@ -29,6 +29,8 @@ library(leaflet)
 
 Sys.setenv(CENSUS_KEY="d606b444d6d806f3ba91342926b0e6e9356b2501")
 
+
+
 dec_population_2020 <-
   listCensusMetadata(
     name = "2020/dec/pl",
@@ -68,6 +70,10 @@ pums_2019_1yr <- getCensus(
     "NPP"
   )
 )
+
+saveRDS(pums_2019_1yr, "project_pums.rds")
+
+pums_2019_1yr <- readRDS("project_pums.rds")
 
 ```
 

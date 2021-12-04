@@ -1,0 +1,117 @@
+---
+title: "Untitled"
+author: "Hunter Dickey"
+date: "12/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(censusapi)
+library(mapview)
+library(tigris)
+library(readxl)
+library(leaflet)
+library(sf)
+library(tidyverse)
+
+Sys.setenv(CENSUS_KEY="c8aa67e4086b4b5ce3a8717f59faa9a28f611dab")
+
+pums_2019_1yr <- readRDS("project_pums.rds")
+
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <- pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+
+bay_pums_clean <- bay_pums %>% 
+  mutate(
+    HINCP = as.numeric(HINCP),
+    HICOV = as.numeric(HICOV),
+    POVPIP = as.numeric(POVPIP),
+    VEH = as.numeric(VEH),
+    
+    firerisk = ifelse(
+      as.numeric(POVPIP) <= 0 &
+        as.numeric(HINCP) < 90000 &
+        as.numeric(HICOV)>=2, 
+      1, 
+      0
+      ),
+  ) %>%
+  arrange(RAC1P) %>%
+  group_by(SERIALNO) %>%
+  summarize_all(first)
+
+bay_pums_clean <- bay_pums_clean %>% 
+  mutate(
+    race = RAC1P %>% 
+      factor(
+        levels = bay_pums_clean$RAC1P %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    health_coverage = HICOV %>% 
+      factor(
+        levels = bay_pums_clean$HICOV %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    income = HINCP %>% 
+      factor(
+        levels = bay_pums_clean$HINCP %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+        ),
+    vehicle = VEH %>% 
+      factor(
+        levels = bay_pums_clean$VEH %>% 
+          unique() %>%
+          as.numeric() %>% 
+          sort()
+      ),
+     PUMA = as.factor(PUMA)
+  )
+
+# B08105A (means of transport)
+# B17020A Poverty 
+# B19001A HINCP 
+# C27001A Health 
+```
+
+
